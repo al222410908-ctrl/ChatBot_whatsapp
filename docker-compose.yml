@@ -96,6 +96,7 @@ services:
       - XDG_CACHE_HOME=/tmp/.cache
       - PORT=2785
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - AUTO_START_SESSIONS=${AUTO_START_SESSIONS:-true}
       # Database
       - DATABASE_TYPE=${DATABASE_TYPE:-sqlite}
       - DATABASE_NAME=${DATABASE_NAME:-/app/data/openwa.sqlite}
@@ -111,6 +112,8 @@ services:
       - SESSION_DATA_PATH=/app/data/sessions
       - PUPPETEER_HEADLESS=${PUPPETEER_HEADLESS:-true}
       - PUPPETEER_ARGS=${PUPPETEER_ARGS:---no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu}
+      - WWEBJS_WEB_VERSION=${WWEBJS_WEB_VERSION:-}
+      - SIMULATE_TYPING=${SIMULATE_TYPING:-false}
       # Storage
       - STORAGE_TYPE=${STORAGE_TYPE:-local}
       - STORAGE_LOCAL_PATH=/app/data/media
@@ -133,7 +136,8 @@ services:
       - PLUGINS_ENABLED=${PLUGINS_ENABLED:-true}
       - PLUGINS_DIR=/app/data/plugins
       # Security
-      - API_MASTER_KEY=${API_MASTER_KEY:-}
+      - API_MASTER_KEY=MiClaveSuperSecreta2026_WhatsApp
+      - SSRF_ALLOWED_HOSTS=${SSRF_ALLOWED_HOSTS:-}
       # Docker socket proxy (openwa-api never touches /var/run/docker.sock directly)
       - DOCKER_HOST=tcp://docker-proxy:2375
     volumes:

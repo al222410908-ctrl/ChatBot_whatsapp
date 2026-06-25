@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Citas - Citas Médicas</title>
+    <!-- Bootstrap 5 & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Estilos compartidos -->
+    <link rel="stylesheet" href="/css/app.css">
+    <!-- FullCalendar CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/es.global.min.js" defer></script>
+    
+    <style>
+        /* Ajustes específicos para la página de citas */
+
+        /* Tabs de navegación con estilos premium consistentes con el diseño de 8px */
+        .nav-pills .nav-link {
+            border-radius: var(--border-radius);
+            color: var(--text-muted);
+            font-weight: 550;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            transition: all 0.2s ease-in-out;
+            background-color: transparent;
+            border: 1px solid transparent;
+        }
+
+        .nav-pills .nav-link:hover {
+            color: var(--color-primary);
+            background-color: rgba(37, 99, 235, 0.05);
+        }
+
+        [data-theme="dark"] .nav-pills .nav-link:hover {
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .nav-pills .nav-link.active {
+            background-color: var(--color-primary);
+            color: #ffffff;
+            border-color: var(--color-primary);
+        }
+
+        [data-theme="dark"] .nav-pills .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* FullCalendar: Integración con la paleta de colores y bordes del sistema */
+        #calendar {
+            background-color: var(--surface-color);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            color: var(--text-main);
+        }
+
+        .fc-header-toolbar {
+            margin-bottom: 1.25em !important;
+        }
+
+        .fc-toolbar-title {
+            font-size: 1.25rem !important;
+            font-weight: 600;
+        }
+
+        /* Botones de FullCalendar */
+        .fc .fc-button-primary {
+            background-color: var(--surface-color) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-main) !important;
+            font-size: 0.85rem !important;
+            font-weight: 550 !important;
+            padding: 6px 12px !important;
+            border-radius: var(--border-radius) !important;
+            box-shadow: none !important;
+            text-transform: capitalize;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .fc .fc-button-primary:hover {
+            background-color: rgba(37, 99, 235, 0.05) !important;
+            border-color: var(--color-primary) !important;
+            color: var(--color-primary) !important;
+        }
+
+        [data-theme="dark"] .fc .fc-button-primary:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border-color: var(--border-hover) !important;
+            color: #ffffff !important;
+        }
+
+        .fc .fc-button-active {
+            background-color: var(--color-primary) !important;
+            border-color: var(--color-primary) !important;
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .fc .fc-button-active {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #ffffff !important;
+        }
+
+        .fc .fc-button-primary:disabled {
+            background-color: var(--surface-color) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-muted) !important;
+            opacity: 0.5;
+        }
+
+        /* Bordes y Grilla del Calendario */
+        .fc-theme-standard td, 
+        .fc-theme-standard th, 
+        .fc-theme-standard .fc-scrollgrid {
+            border-color: var(--border-color) !important;
+        }
+
+        .fc-col-header-cell {
+            background-color: rgba(100, 116, 139, 0.02);
+            padding: 8px 0 !important;
+        }
+
+        [data-theme="dark"] .fc-col-header-cell {
+            background-color: rgba(255, 255, 255, 0.01);
+        }
+
+        .fc-col-header-cell-cushion {
+            color: var(--text-muted) !important;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .fc-daygrid-day-number {
+            color: var(--text-main) !important;
+            font-weight: 500;
+            font-size: 0.85rem;
+            padding: 6px !important;
+        }
+
+        .fc-daygrid-day.fc-day-today {
+            background-color: rgba(37, 99, 235, 0.04) !important;
+        }
+
+        [data-theme="dark"] .fc-daygrid-day.fc-day-today {
+            background-color: rgba(255, 255, 255, 0.02) !important;
+        }
+
+        /* Eventos del Calendario */
+        .fc-event {
+            border-radius: 4px !important;
+            padding: 2px 4px !important;
+            font-size: 0.78rem !important;
+            font-weight: 550;
+            border: none !important;
+        }
+
+        /* Pulsing Dot for Live Chat */
+        .nav-link .badge-dot {
+            background: #f43f5e;
+            border-radius: 50%;
+            width: 8px;
+            height: 8px;
+            margin-left: auto;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .5; transform: scale(1.3); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">            <!-- Sidebar Navigation -->
+            <div class="col-md-2 sidebar p-0 d-flex flex-column d-none d-md-flex">
+                <div class="p-4 brand-title d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-hospital fs-4" style="color:#818cf8"></i>
+                    <span class="fs-5">Citas Médicas</span>
+                </div>
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="/dashboard"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+                    <a class="nav-link active" href="/citas"><i class="bi bi-calendar3"></i> Citas</a>
+                    <a class="nav-link" href="/pacientes"><i class="bi bi-people-fill"></i> Pacientes</a>
+                    <a class="nav-link" href="/mensajes"><i class="bi bi-chat-left-dots-fill"></i> Mensajes</a>
+                    <a class="nav-link" href="/chat"><i class="bi bi-chat-dots-fill"></i> Chat en Vivo <span class="badge-dot ms-auto" id="unread-dot" style="display:none"></span></a>
+                    <a class="nav-link" href="/analytics"><i class="bi bi-bar-chart-line-fill"></i> Analytics</a>
+                    <a class="nav-link" href="/configuracion"><i class="bi bi-gear-fill"></i> Configuración</a>
+                </nav>
+
+                <!-- WhatsApp Status Widget -->
+                <div class="wa-status-widget mx-2 mt-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="wa-dot off" id="ws-status-icon"></span>
+                        <span class="fw-semibold small text-main">WhatsApp Bot</span>
+                    </div>
+                    <div id="ws-status-text" class="small text-muted">Consultando...</div>
+                    <div id="ws-qr-container" class="mt-2 text-center d-none">
+                        <img id="ws-qr-img" src="" alt="Escanee QR" class="img-fluid rounded" style="max-height:120px">
+                        <div class="small mt-1 text-warning">📱 Escanee para conectar</div>
+                    </div>
+                    <button onclick="reconectarWA()" class="btn btn-sm w-100 mt-2">
+                        <i class="bi bi-arrow-repeat me-1"></i>Reconectar
+                    </button>
+                </div>
+
+                <div class="px-3 py-2 mt-auto mb-2">
+                    <button class="btn-sidebar-action mb-2 animate-hover" onclick="toggleDark()">
+                        <i class="bi bi-moon-fill" id="dark-icon"></i> Modo Oscuro
+                    </button>
+                    <a href="/logout" class="btn-sidebar-action btn-sidebar-danger animate-hover">
+                        <i class="bi bi-box-arrow-left"></i> Cerrar Sesión
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="col-md-10 main-content">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+                    <div>
+                        <h2 class="fw-bold mb-1">Gestión de Citas</h2>
+                        <p class="text-muted mb-0">Listado y calendario de todas las consultas médicas</p>
+                    </div>
+                    <div class="d-inline-flex gap-2">
+                        <a href="/api/citas/exportar-csv" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar CSV</a>
+                        <a href="/citas/nueva" class="btn btn-primary text-white"><i class="bi bi-calendar-plus me-1"></i> Nueva Cita</a>
+                    </div>
+                </div>
+
+                <!-- Tabs header -->
+                <ul class="nav nav-pills mb-4" id="citasTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="listado-tab" data-bs-toggle="tab" data-bs-target="#listado-tab-pane" type="button" role="tab"><i class="bi bi-list-task me-1"></i> Listado de Citas</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="calendario-tab" data-bs-toggle="tab" data-bs-target="#calendario-tab-pane" type="button" role="tab"><i class="bi bi-calendar-range me-1"></i> Calendario Visual</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="citasTabContent">
+                    <!-- Tab Listado -->
+                    <div class="tab-pane fade show active" id="listado-tab-pane" role="tabpanel" tabindex="0">
+                        
+                        <!-- Filtros de Búsqueda -->
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <form method="GET" action="/citas" class="row g-3">
+                                    <div class="col-md-3">
+                                        <label for="buscar" class="form-label small fw-semibold text-muted">Buscar</label>
+                                        <input type="text" class="form-control form-control-sm" id="buscar" name="buscar" placeholder="Paciente, teléfono, motivo..." value="<%= (typeof filtros !== 'undefined' && filtros.buscar) ? filtros.buscar : '' %>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="estado" class="form-label small fw-semibold text-muted">Estado</label>
+                                        <select class="form-select form-select-sm" id="estado" name="estado">
+                                            <option value="">Todos</option>
+                                            <option value="pendiente" <%= (typeof filtros !== 'undefined' && filtros.estado === 'pendiente') ? 'selected' : '' %>>⏳ Pendiente</option>
+                                            <option value="confirmada" <%= (typeof filtros !== 'undefined' && filtros.estado === 'confirmada') ? 'selected' : '' %>>✅ Confirmada</option>
+                                            <option value="cancelada" <%= (typeof filtros !== 'undefined' && filtros.estado === 'cancelada') ? 'selected' : '' %>>❌ Cancelada</option>
+                                            <option value="reagendada" <%= (typeof filtros !== 'undefined' && filtros.estado === 'reagendada') ? 'selected' : '' %>>🔄 Reagendada</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="fecha_desde" class="form-label small fw-semibold text-muted">Desde</label>
+                                        <input type="date" class="form-control form-control-sm" id="fecha_desde" name="fecha_desde" value="<%= (typeof filtros !== 'undefined' && filtros.fecha_desde) ? filtros.fecha_desde : '' %>">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="fecha_hasta" class="form-label small fw-semibold text-muted">Hasta</label>
+                                        <input type="date" class="form-control form-control-sm" id="fecha_hasta" name="fecha_hasta" value="<%= (typeof filtros !== 'undefined' && filtros.fecha_hasta) ? filtros.fecha_hasta : '' %>">
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end gap-2">
+                                        <button type="submit" class="btn btn-sm btn-primary w-100"><i class="bi bi-filter"></i> Filtrar</button>
+                                        <a href="/citas" class="btn btn-sm btn-outline-secondary w-100">Limpiar</a>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-body p-0">
+                                <% if (citas.length > 0) { %>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Paciente</th>
+                                                    <th>Teléfono</th>
+                                                    <th>Fecha</th>
+                                                    <th>Hora</th>
+                                                    <th>Motivo</th>
+                                                    <th>Estado</th>
+                                                    <th>Calificación</th>
+                                                    <th>Notas</th>
+                                                    <th class="text-end">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <% citas.forEach(cita => { %>
+                                                    <tr>
+                                                        <td class="text-muted">#<%= cita.id %></td>
+                                                        <td class="fw-semibold"><%= cita.paciente_nombre %></td>
+                                                        <td><i class="bi bi-whatsapp text-success me-1"></i> <%= cita.paciente_telefono %></td>
+                                                        <td><%= new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-ES') %></td>
+                                                        <td class="fw-semibold text-primary"><%= cita.hora %></td>
+                                                        <td><span class="text-muted"><%= cita.motivo %></span></td>
+                                                        <td>
+                                                            <% if (cita.estado === 'confirmada') { %>
+                                                                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Confirmada</span>
+                                                            <% } else if (cita.estado === 'cancelada') { %>
+                                                                <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> Cancelada</span>
+                                                            <% } else if (cita.estado === 'reagendada') { %>
+                                                                <span class="badge bg-info text-dark"><i class="bi bi-arrow-repeat me-1"></i> Reagendada</span>
+                                                            <% } else { %>
+                                                                <span class="badge bg-warning text-dark"><i class="bi bi-clock-fill me-1"></i> Pendiente</span>
+                                                            <% } %>
+                                                        </td>
+                                                        <td>
+                                                            <% if (cita.calificacion) { %>
+                                                                <span class="text-warning fw-semibold">
+                                                                    <% for(let i=0; i<cita.calificacion; i++) { %>★<% } %>
+                                                                    <span class="text-muted small">(<%= cita.calificacion %>)</span>
+                                                                </span>
+                                                            <% } else if (cita.estado === 'confirmada') { %>
+                                                                <span class="text-muted small">Pendiente encuesta</span>
+                                                            <% } else { %>
+                                                                <span class="text-muted small">-</span>
+                                                            <% } %>
+                                                        </td>
+                                                        <td>
+                                                            <% if (cita.notas) { %>
+                                                                <span class="text-muted small" title="<%= cita.notas %>"><%= cita.notas.length > 25 ? cita.notas.substring(0, 22) + '...' : cita.notas %></span>
+                                                            <% } else { %>
+                                                                <span class="text-muted small">-</span>
+                                                            <% } %>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <div class="d-inline-flex gap-2">
+                                                                <a href="/citas/<%= cita.id %>/editar" class="btn btn-sm btn-outline-primary" style="padding: 6px 10px; border-radius:8px;">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </a>
+                                                                <form action="/citas/<%= cita.id %>/eliminar" method="POST" style="display: inline;" onsubmit="return confirm('¿Estás seguro de eliminar esta cita?')">
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger" style="padding: 6px 10px; border-radius:8px;">
+                                                                        <i class="bi bi-trash"></i>
+                                                                    </button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                <% }); %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <% } else { %>
+                                    <div class="text-center py-5 text-muted">
+                                        <i class="bi bi-calendar-x fs-1 opacity-50"></i>
+                                        <p class="mt-2 mb-3">No hay citas médicas registradas en la base de datos.</p>
+                                        <a href="/citas/nueva" class="btn btn-primary text-white"><i class="bi bi-calendar-plus me-1"></i> Agendar Primera Cita</a>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tab Calendario -->
+                    <div class="tab-pane fade" id="calendario-tab-pane" role="tabpanel" tabindex="0">
+                        <div class="card p-4">
+                            <div id="calendar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Dark Mode & SSE script -->
+    <script>
+        // Dark Mode Toggle
+        function toggleDark() {
+            const html = document.documentElement;
+            const isDark = html.getAttribute('data-theme') === 'dark';
+            const nextTheme = isDark ? '' : 'dark';
+            html.setAttribute('data-theme', nextTheme);
+            html.setAttribute('data-bs-theme', nextTheme === 'dark' ? 'dark' : 'light');
+            
+            const icon = document.getElementById('dark-icon');
+            if (icon) {
+                icon.className = isDark ? 'bi bi-moon-fill' : 'bi bi-sun-fill';
+                const parent = icon.parentElement;
+                if (parent) {
+                    parent.innerHTML = isDark
+                        ? '<i class="bi bi-moon-fill" id="dark-icon"></i> Modo Oscuro'
+                        : '<i class="bi bi-sun-fill" id="dark-icon"></i> Modo Claro';
+                }
+            }
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        }
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+            document.addEventListener('DOMContentLoaded', () => {
+                const icon = document.getElementById('dark-icon');
+                if (icon) {
+                    icon.className = 'bi bi-sun-fill';
+                    const parent = icon.parentElement;
+                    if (parent) {
+                        parent.innerHTML = '<i class="bi bi-sun-fill" id="dark-icon"></i> Modo Claro';
+                    }
+                }
+            });
+        }
+
+        async function reconectarWA() {
+            try {
+                await fetch('/api/whatsapp/reconectar', { method: 'POST' });
+            } catch (e) {}
+        }
+
+        // Fetch unread chat count & SSE status
+        async function loadUnreadCount() {
+            try {
+                const res = await fetch('/api/chat/no-leidos');
+                const data = await res.json();
+                const dot = document.getElementById('unread-dot');
+                if (dot) {
+                    dot.style.display = data.count > 0 ? 'inline-block' : 'none';
+                }
+            } catch (err) { console.error('Error fetching unread count:', err); }
+        }
+        loadUnreadCount();
+
+        // Connect to SSE for real-time status and unread messages
+        const sseConn = new EventSource('/api/updates/live');
+        sseConn.addEventListener('wa_status', e => {
+            const d = JSON.parse(e.data);
+            const dot = document.getElementById('ws-status-icon') || document.getElementById('wa-dot');
+            const text = document.getElementById('ws-status-text') || document.getElementById('wa-text');
+            const qrContainer = document.getElementById('ws-qr-container');
+            const qrImg = document.getElementById('ws-qr-img');
+            
+            if (dot && text) {
+                if (d.status === 'conectado') {
+                    dot.className = 'bi bi-circle-fill text-success wa-dot on';
+                    text.innerText = 'Conectado (Listo)';
+                    if (qrContainer) qrContainer.classList.add('d-none');
+                } else {
+                    dot.className = 'bi bi-circle-fill text-danger wa-dot';
+                    text.innerText = `Desconectado (${d.status})`;
+                    if (d.qrCode && qrContainer) {
+                        qrImg.src = d.qrCode;
+                        qrContainer.classList.remove('d-none');
+                    } else if (qrContainer) {
+                        qrContainer.classList.add('d-none');
+                    }
+                }
+            }
+        });
+        sseConn.addEventListener('mensaje', e => {
+            const d = JSON.parse(e.data);
+            if (d.remitente === 'paciente') {
+                const dot = document.getElementById('unread-dot');
+                if (dot) dot.style.display = 'inline-block';
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (sseConn) sseConn.close();
+        });
+    </script>
+
+    <!-- FullCalendar initialization script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                events: [
+                    <% citas.forEach(cita => { 
+                        let color = '#eab308'; // amarillo (pendiente)
+                        if (cita.estado === 'confirmada') color = '#22c55e'; // verde
+                        if (cita.estado === 'cancelada') color = '#ef4444'; // rojo
+                        if (cita.estado === 'reagendada') color = '#06b6d4'; // cian
+                    %>
+                    {
+                        id: '<%= cita.id %>',
+                        title: '<%= cita.paciente_nombre.replace(/'/g, "\\'") %> - <%= cita.motivo ? cita.motivo.replace(/'/g, "\\'") : "Consulta" %>',
+                        start: '<%= cita.fecha %>T<%= cita.hora %>',
+                        color: '<%= color %>',
+                        textColor: '#ffffff',
+                        extendedProps: {
+                            paciente: '<%= cita.paciente_nombre.replace(/'/g, "\\'") %>',
+                            telefono: '<%= cita.paciente_telefono %>',
+                            motivo: '<%= cita.motivo ? cita.motivo.replace(/'/g, "\\'") : "Consulta" %>',
+                            estado: '<%= cita.estado %>'
+                        }
+                    },
+                    <% }); %>
+                ],
+                eventClick: function(info) {
+                    const props = info.event.extendedProps;
+                    let estadoBadge = '<span class="badge bg-warning text-dark">Pendiente</span>';
+                    if (props.estado === 'confirmada') estadoBadge = '<span class="badge bg-success">Confirmada</span>';
+                    if (props.estado === 'cancelada') estadoBadge = '<span class="badge bg-danger">Cancelada</span>';
+                    if (props.estado === 'reagendada') estadoBadge = '<span class="badge bg-info text-dark">Reagendada</span>';
+
+                    const modalContent = `
+                        <div class="modal fade" id="calendarEventModal" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content" style="border-radius: var(--border-radius);">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold">Detalle de la Cita</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="mb-2"><strong>Paciente:</strong> ${props.paciente}</p>
+                                        <p class="mb-2"><strong>Teléfono:</strong> +${props.telefono}</p>
+                                        <p class="mb-2"><strong>Fecha/Hora:</strong> ${new Date(info.event.start).toLocaleString('es-ES')}</p>
+                                        <p class="mb-2"><strong>Motivo:</strong> ${props.motivo}</p>
+                                        <p class="mb-0"><strong>Estado:</strong> ${estadoBadge}</p>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <a href="/citas/${info.event.id}/editar" class="btn btn-primary btn-sm text-white">Editar Cita</a>
+                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    const oldModal = document.getElementById('calendarEventModal');
+                    if (oldModal) oldModal.remove();
+
+                    document.body.insertAdjacentHTML('beforeend', modalContent);
+                    var modal = new bootstrap.Modal(document.getElementById('calendarEventModal'));
+                    modal.show();
+                }
+            });
+            
+            const tabEl = document.getElementById('calendario-tab');
+            tabEl.addEventListener('shown.bs.tab', function () {
+                calendar.render();
+            });
+        });
+    </script>
+</body>
+</html>

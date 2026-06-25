@@ -33,7 +33,14 @@
     "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
     "migration:revert:prod": "npm run typeorm:prod -- migration:revert -d dist/database/data-source.js",
     "migration:show": "npm run typeorm -- migration:show -d src/database/data-source.ts",
-    "migration:show:prod": "npm run typeorm:prod -- migration:show -d dist/database/data-source.js"
+    "migration:show:prod": "npm run typeorm:prod -- migration:show -d dist/database/data-source.js",
+    "launcher": "node launcher.js",
+    "build:exe": "node build-exe.js"
+  },
+  "pkg": {
+    "targets": ["node18-win-x64"],
+    "outputPath": ".",
+    "assets": []
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",
@@ -51,10 +58,15 @@
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "archiver": "^8.0.0",
+    "axios": "^1.18.0",
+    "body-parser": "^2.3.0",
     "bullmq": "^5.78.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dockerode": "^5.0.0",
+    "ejs": "^6.0.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
     "helmet": "^8.2.0",
     "ioredis": "^5.11.1",
     "pg": "^8.21.0",
@@ -135,5 +147,20 @@
       }
     },
     "testEnvironment": "node"
-  }
+  },
+  "main": "chatbot-citas.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rmyndharis/OpenWA.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/rmyndharis/OpenWA/issues"
+  },
+  "homepage": "https://github.com/rmyndharis/OpenWA#readme"
 }
