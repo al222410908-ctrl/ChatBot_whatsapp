@@ -10,10 +10,22 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- SweetAlert2 & Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Estilos compartidos -->
     <link rel="stylesheet" href="/css/app.css">
     <style>
         /* ── Estilos específicos del Dashboard ── */
+        .stat-card {
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+        }
         .today-citas-card {
             background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #6d28d9 100%);
             color: white;
@@ -21,6 +33,11 @@
             padding: 28px;
             position: relative;
             overflow: hidden;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .today-citas-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(79, 70, 229, 0.2);
         }
         .today-citas-card::before {
             content: '';
@@ -249,16 +266,34 @@
                             </div>
                         </div>
 
+                        <!-- Workload Weekly Chart -->
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart-line text-primary me-2"></i>Carga de Trabajo Semanal</h5>
+                                <div style="height: 180px; position: relative;">
+                                    <canvas id="workloadChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Upcoming Appointments -->
                         <div class="card mb-4">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                                 <h5 class="fw-bold mb-0"><i class="bi bi-calendar-week text-primary me-2"></i>Próximas Citas</h5>
-                                <a href="/citas" class="btn btn-sm btn-light">Ver todo <i class="bi bi-arrow-right"></i></a>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Filtro de citas">
+                                        <button type="button" class="btn btn-outline-secondary active" onclick="filterCitas('todas', this)">Todas</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="filterCitas('hoy', this)">Hoy</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="filterCitas('manana', this)">Mañana</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="filterCitas('semana', this)">Esta Semana</button>
+                                    </div>
+                                    <a href="/citas" class="btn btn-sm btn-light">Ver todo <i class="bi bi-arrow-right"></i></a>
+                                </div>
                             </div>
                             <div class="card-body p-0">
                                 <% if (citas.length > 0) { %>
                                     <div class="table-responsive">
-                                        <table class="table table-hover">
+                                        <table class="table table-hover align-middle mb-0">
                                             <thead>
                                                 <tr>
                                                     <th>Paciente</th>
@@ -266,14 +301,19 @@
                                                     <th>Hora</th>
                                                     <th>Motivo</th>
                                                     <th>Estado</th>
+                                                    <th class="text-end pe-4">Acciones</th>
                                                 </tr>
                                             </thead>
-                                            <tbody>
+                                            <tbody id="citas-table-body">
                                                 <% citas.forEach(cita => { %>
-                                                    <tr>
-                                                        <td class="fw-semibold"><%= cita.paciente_nombre %></td>
+                                                    <tr data-fecha="<%= cita.fecha %>">
+                                                        <td class="fw-semibold">
+                                                            <%= cita.paciente_nombre %>
+                                                            <br>
+                                                            <small class="text-muted" style="font-size:0.75rem;"><%= cita.paciente_telefono %></small>
+                                                        </td>
                                                         <td><%= new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-ES') %></td>
-                                                        <td class="fw-semibold text-primary"><%= cita.hora %></td>
+                                                        <td class="fw-semibold text-primary"><%= cita.hora.substring(0, 5) %></td>
                                                         <td><span class="text-muted"><%= cita.motivo %></span></td>
                                                         <td>
                                                             <% if (cita.estado === 'confirmada') { %>
@@ -285,6 +325,11 @@
                                                             <% } else { %>
                                                                 <span class="badge bg-warning text-dark"><i class="bi bi-clock-fill me-1"></i>Pendiente</span>
                                                             <% } %>
+                                                        </td>
+                                                        <td class="text-end pe-4">
+                                                            <a href="/chat?phone=<%= cita.paciente_telefono %>" class="btn btn-sm btn-outline-primary" style="border-radius: 20px; font-size: 0.8rem; padding: 4px 12px;">
+                                                                <i class="bi bi-chat-dots-fill me-1"></i> Chat
+                                                            </a>
                                                         </td>
                                                     </tr>
                                                 <% }); %>
@@ -345,41 +390,45 @@
 
                         <!-- Bot Guide -->
                         <div class="card mb-4 border-start border-primary border-4">
-                            <div class="card-body">
-                                <h5 class="fw-bold mb-4"><i class="bi bi-question-circle text-primary"></i> Guía del Chatbot</h5>
-
-                                <div class="guide-step">
-                                    <div class="guide-step-icon">1</div>
-                                    <div class="guide-step-content">
-                                        <h6>Registro y Envío</h6>
-                                        <p>Registra citas con estado <strong>Pendiente</strong>. El sistema enviará un WhatsApp al paciente 24 horas antes solicitando confirmación.</p>
+                            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center py-3" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#chatbotGuideCollapse" aria-expanded="true" onclick="toggleGuideIcon(this)">
+                                <h5 class="fw-bold mb-0"><i class="bi bi-question-circle text-primary me-2"></i>Guía del Chatbot</h5>
+                                <i class="bi bi-chevron-up text-muted" id="guide-chevron-icon"></i>
+                            </div>
+                            <div class="collapse show" id="chatbotGuideCollapse">
+                                <div class="card-body pt-0">
+                                    <div class="guide-step">
+                                        <div class="guide-step-icon">1</div>
+                                        <div class="guide-step-content">
+                                            <h6>Registro y Envío</h6>
+                                            <p>Registra citas con estado <strong>Pendiente</strong>. El sistema enviará un WhatsApp al paciente 24 horas antes solicitando confirmación.</p>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div class="guide-step">
-                                    <div class="guide-step-icon">2</div>
-                                    <div class="guide-step-content">
-                                        <h6>Respuestas y Flujos</h6>
-                                        <ul class="ps-3 mt-1 mb-0 text-muted" style="font-size:0.85rem;">
-                                            <li><strong>Confirmar ("Si" / "1"):</strong> Cita pasa a <span class="text-success fw-bold">confirmada</span>.</li>
-                                            <li><strong>Cancelar ("No" / "2"):</strong> Cita pasa a <span class="text-danger fw-bold">cancelada</span>.</li>
-                                            <li><strong>Reagendar ("Reagendar" / "3"):</strong> Muestra 5 fechas sugeridas con horarios libres. El paciente puede responder con el número (1-5) o fecha manual.</li>
-                                            <li><strong>Chat en Vivo Silencioso:</strong> El chatbot no responderá a mensajes libres fuera del flujo, permitiéndote chatear manualmente sin interrupciones.</li>
-                                        </ul>
+                                    <div class="guide-step">
+                                        <div class="guide-step-icon">2</div>
+                                        <div class="guide-step-content">
+                                            <h6>Respuestas y Flujos</h6>
+                                            <ul class="ps-3 mt-1 mb-0 text-muted" style="font-size:0.85rem;">
+                                                <li><strong>Confirmar ("Si" / "1"):</strong> Cita pasa a <span class="text-success fw-bold">confirmada</span>.</li>
+                                                <li><strong>Cancelar ("No" / "2"):</strong> Cita pasa a <span class="text-danger fw-bold">cancelada</span>.</li>
+                                                <li><strong>Reagendar ("Reagendar" / "3"):</strong> Muestra 5 fechas sugeridas con horarios libres. El paciente puede responder con el número (1-5) o fecha manual.</li>
+                                                <li><strong>Chat en Vivo Silencioso:</strong> El chatbot no responderá a mensajes libres fuera del flujo, permitiéndote chatear manualmente sin interrupciones.</li>
+                                            </ul>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div class="guide-step mb-3">
-                                    <div class="guide-step-icon">3</div>
-                                    <div class="guide-step-content">
-                                        <h6>Protección Anti-Spam</h6>
-                                        <p>El sistema envía mensajes solo entre <strong>8:00 AM – 9:00 PM</strong> con delays aleatorios y rotación de plantillas.</p>
+                                    <div class="guide-step mb-3">
+                                        <div class="guide-step-icon">3</div>
+                                        <div class="guide-step-content">
+                                            <h6>Protección Anti-Spam</h6>
+                                            <p>El sistema envía mensajes solo entre <strong>8:00 AM – 9:00 PM</strong> con delays aleatorios y rotación de plantillas.</p>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div class="alert alert-warning py-2 px-3 mb-0" style="font-size:0.83rem;border-radius:12px;">
-                                    <i class="bi bi-info-circle-fill me-1"></i>
-                                    <strong>Conexión:</strong> Verifica que el <span class="badge bg-success" style="font-size:0.75rem;">● Conectado</span> aparezca en el panel lateral antes de procesar mensajes.
+                                    <div class="alert alert-warning py-2 px-3 mb-0" style="font-size:0.83rem;border-radius:12px;">
+                                        <i class="bi bi-info-circle-fill me-1"></i>
+                                        <strong>Conexión:</strong> Verifica que el <span class="badge bg-success" style="font-size:0.75rem;">● Conectado</span> aparezca en el panel lateral antes de procesar mensajes.
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -552,48 +601,81 @@
             if (sseConn) sseConn.close();
         });
 
-        // ── Acciones rápidas ──────────────────────────────────────
-        function showResult(html, delay = 3000) {
-            const div = document.getElementById('quickActionResult');
-            div.style.display = 'block';
-            div.innerHTML = html;
-            if (delay) setTimeout(() => { div.style.display = 'none'; }, delay);
-        }
+        // ── SweetAlert2 Toast configuration ───────────────────────
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
 
+        // ── Acciones rápidas con SweetAlert2 ──────────────────────
         async function forzarRecordatorios() {
-            showResult('<div class="alert alert-info py-2 px-3 mb-0"><i class="bi bi-hourglass-split me-1"></i> Procesando recordatorios...</div>', 0);
+            Swal.fire({
+                title: 'Procesando recordatorios',
+                text: 'Buscando citas de mañana para enviar avisos...',
+                icon: 'info',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
             try {
                 const res = await fetch('/api/recordatorios/forzar', { method: 'POST' });
                 const data = await res.json();
                 const msg = data.mensaje || `Se procesaron los recordatorios correctamente.`;
-                showResult(`<div class="alert alert-success py-2 px-3 mb-0"><i class="bi bi-check-circle-fill me-1"></i> ${msg}</div>`);
-                setTimeout(() => location.reload(), 2500);
+                Swal.fire({
+                    title: '¡Procesados!',
+                    text: msg,
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                setTimeout(() => location.reload(), 2000);
             } catch (err) {
-                showResult('<div class="alert alert-danger py-2 px-3 mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i> Error al forzar los recordatorios.</div>');
+                Swal.fire('Error', 'No se pudieron forzar los recordatorios.', 'error');
             }
         }
 
         async function reintentarFallidos() {
-            showResult('<div class="alert alert-info py-2 px-3 mb-0"><i class="bi bi-hourglass-split me-1"></i> Reintentando mensajes fallidos...</div>', 0);
+            Swal.fire({
+                title: 'Reintentando envíos',
+                text: 'Reenviando mensajes fallidos y pendientes...',
+                icon: 'info',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
             try {
                 const res = await fetch('/api/recordatorios/reintentar', { method: 'POST' });
                 const data = await res.json();
                 const r = data.resultado;
-                showResult(`<div class="alert alert-success py-2 px-3 mb-0"><i class="bi bi-check-circle-fill me-1"></i> Éxito: <strong>${r.exitosos}/${r.reintentados}</strong> mensajes reenviados.</div>`);
-                setTimeout(() => location.reload(), 2500);
+                Swal.fire({
+                    title: 'Completado',
+                    text: `Éxito: ${r.exitosos}/${r.reintentados} mensajes reenviados.`,
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                setTimeout(() => location.reload(), 2000);
             } catch (err) {
-                showResult('<div class="alert alert-danger py-2 px-3 mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i> Error al reintentar.</div>');
+                Swal.fire('Error', 'No se pudieron reintentar los mensajes.', 'error');
             }
         }
 
         async function reconectarWA() {
+            Toast.fire({
+                icon: 'info',
+                title: 'Reconectando WhatsApp...'
+            });
             try {
                 await fetch('/api/whatsapp/reconectar', { method: 'POST' });
-                showResult('<div class="alert alert-info py-2 px-3 mb-0"><i class="bi bi-arrow-repeat me-1"></i> Reconectando WhatsApp...</div>', 5000);
             } catch (e) {}
         }
 
-        // ── Modal: Mensaje de prueba ──────────────────────────────
+        // ── Modal: Mensaje de prueba con SweetAlert2 ──────────────
         function showTestMsgModal() {
             document.getElementById('test-phone-input').value = '';
             document.getElementById('test-msg-result').style.display = 'none';
@@ -609,7 +691,7 @@
                 return;
             }
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = '<div class="alert alert-info py-2 px-3 mb-0 mt-2"><i class="bi bi-hourglass-split me-1"></i> Enviando mensaje de prueba...</div>';
+            resultDiv.innerHTML = '<div class="alert alert-info py-2 px-3 mb-0 mt-2"><i class="bi bi-hourglass-split me-1"></i> Enviando mensaje...</div>';
             try {
                 const res = await fetch('/api/mensajes/test', {
                     method: 'POST',
@@ -618,7 +700,8 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    resultDiv.innerHTML = `<div class="alert alert-success py-2 px-3 mb-0 mt-2"><i class="bi bi-check-circle-fill me-1"></i> ¡Mensaje enviado a <strong>+${data.telefono}</strong>! Verifica que llegó al WhatsApp.</div>`;
+                    bootstrap.Modal.getInstance(document.getElementById('testMsgModal')).hide();
+                    Swal.fire('Enviado', `Mensaje enviado correctamente a +${data.telefono}`, 'success');
                 } else {
                     resultDiv.innerHTML = `<div class="alert alert-danger py-2 px-3 mb-0 mt-2"><i class="bi bi-exclamation-triangle-fill me-1"></i> Error: ${data.error || 'No se pudo enviar'}</div>`;
                 }
@@ -627,11 +710,138 @@
             }
         }
 
-        // Inicializar Lucide Icons
+        // ── Filtro de Citas ───────────────────────────────────────
+        function filterCitas(type, btn) {
+            const container = btn.parentElement;
+            container.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const rows = document.querySelectorAll('#citas-table-body tr');
+            const hoy = new Date();
+            hoy.setHours(0,0,0,0);
+
+            const manana = new Date(hoy);
+            manana.setDate(manana.getDate() + 1);
+
+            const finSemana = new Date(hoy);
+            finSemana.setDate(finSemana.getDate() + 7);
+
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const fechaStr = row.dataset.fecha;
+                if (!fechaStr) return;
+                const rowDate = new Date(fechaStr + 'T00:00:00');
+                rowDate.setHours(0,0,0,0);
+
+                let show = false;
+                if (type === 'todas') show = true;
+                else if (type === 'hoy') show = rowDate.getTime() === hoy.getTime();
+                else if (type === 'manana') show = rowDate.getTime() === manana.getTime();
+                else if (type === 'semana') show = rowDate >= hoy && rowDate <= finSemana;
+
+                if (show) {
+                    row.classList.remove('d-none');
+                    visibleCount++;
+                } else {
+                    row.classList.add('d-none');
+                }
+            });
+
+            const emptyRow = document.getElementById('citas-empty-row');
+            if (visibleCount === 0) {
+                if (!emptyRow) {
+                    const tr = document.createElement('tr');
+                    tr.id = 'citas-empty-row';
+                    tr.innerHTML = `<td colspan="6" class="text-center py-4 text-muted"><i class="bi bi-calendar-x me-1"></i> No hay citas para este filtro.</td>`;
+                    document.getElementById('citas-table-body').appendChild(tr);
+                } else {
+                    emptyRow.classList.remove('d-none');
+                }
+            } else {
+                if (emptyRow) emptyRow.classList.add('d-none');
+            }
+        }
+
+        // ── Toggle de Guía Chevron ────────────────────────────────
+        function toggleGuideIcon(el) {
+            const icon = document.getElementById('guide-chevron-icon');
+            if (icon) {
+                setTimeout(() => {
+                    const isCollapsed = !document.getElementById('chatbotGuideCollapse').classList.contains('show');
+                    icon.className = isCollapsed ? 'bi bi-chevron-down text-muted' : 'bi bi-chevron-up text-muted';
+                }, 350);
+            }
+        }
+
+        // ── Inicializaciones ──────────────────────────────────────
         document.addEventListener('DOMContentLoaded', () => {
             if (window.lucide) {
                 window.lucide.createIcons();
             }
+
+            // Iniciar gráfico de carga de trabajo (Chart.js)
+            const statsData = <%- JSON.stringify(proximasCitasStats || []) %>;
+            
+            const labels = [];
+            const dataPoints = [];
+            const hoy = new Date();
+
+            for (let i = 0; i < 7; i++) {
+                const tempDate = new Date(hoy);
+                tempDate.setDate(hoy.getDate() + i);
+                
+                const yyyy = tempDate.getFullYear();
+                const mm = String(tempDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(tempDate.getDate()).padStart(2, '0');
+                const isoStr = `${yyyy}-${mm}-${dd}`;
+                
+                const dayLabelName = tempDate.toLocaleDateString('es-ES', { weekday: 'short' });
+                const capitalizedDay = dayLabelName.charAt(0).toUpperCase() + dayLabelName.slice(1);
+                labels.push(`${capitalizedDay} ${dd}/${mm}`);
+
+                const statFound = statsData.find(s => s.fecha === isoStr);
+                dataPoints.push(statFound ? statFound.cantidad : 0);
+            }
+
+            const ctx = document.getElementById('workloadChart').getContext('2d');
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+            gradient.addColorStop(0, '#6366f1');
+            gradient.addColorStop(1, '#818cf8');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Número de Citas',
+                        data: dataPoints,
+                        backgroundColor: gradient,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                        barPercentage: 0.55
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, color: '#94a3b8' },
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
         });
     </script>
 </body>

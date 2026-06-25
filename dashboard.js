@@ -1149,8 +1149,17 @@ app.get('/dashboard', async (req, res) => {
         (SELECT COUNT(*) FROM citas WHERE fecha = ? AND estado = 'confirmada') as citas_manana
     `, [mananaStr]);
 
+    const proximasCitasStats = await dbAll(`
+      SELECT fecha, COUNT(*) as cantidad
+      FROM citas
+      WHERE fecha >= ? AND estado != 'cancelada'
+      GROUP BY fecha
+      ORDER BY fecha ASC
+      LIMIT 7
+    `, [hoyStr]);
+
     const waState = { status: waStatus, phone: waPhone, qr: waQr };
-    res.render('dashboard', { stats, citas, pacientes, recordatoriosStats, waState });
+    res.render('dashboard', { stats, citas, pacientes, recordatoriosStats, waState, proximasCitasStats });
   } catch (error) {
     console.error('Error dashboard:', error);
     res.status(500).send('Error cargando dashboard');

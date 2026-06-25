@@ -648,6 +648,21 @@
         }
         loadUnreadCount();
 
+        // Abrir chat automático desde query parameter (?phone=...) o (?telefono=...)
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const phoneParam = urlParams.get('phone') || urlParams.get('telefono');
+            if (phoneParam) {
+                const cleanPhone = phoneParam.replace(/\D/g, '');
+                setTimeout(() => {
+                    const contactEl = document.querySelector(`.contact-item[data-phone="${cleanPhone}"]`);
+                    if (contactEl) {
+                        selectContact(contactEl);
+                    }
+                }, 300);
+            }
+        });
+
         // Conectar al Server-Sent Events (SSE) para actualizaciones en tiempo real
         const liveUpdates = new EventSource('/api/updates/live');
         
