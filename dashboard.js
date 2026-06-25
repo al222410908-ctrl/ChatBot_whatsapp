@@ -694,14 +694,20 @@ async function iniciarAgendamiento(telefono) {
     db.get('SELECT nombre FROM pacientes WHERE telefono = ?', [telefono], (err, row) => resolve(row));
   });
 
+  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(5);
+
   if (paciente && paciente.nombre) {
     const nombre = paciente.nombre.trim();
-    const datos = { nombre };
+    const datos = { nombre, fechasSugeridas: diasDisponibles.map(d => d.fechaISO) };
     await guardarEstadoConversacion(telefono, 'esperando_fecha', datos);
-    await recordatorios.enviarMensaje(
-      telefono,
-      `📅 *Agendar Nueva Cita*\n\nHola *${nombre}*, gusto en saludarte nuevamente. 😊\n\n📅 ¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato DD/MM/YYYY (ej: 17/06/2026)`
-    );
+
+    let msg = `📅 *Agendar Nueva Cita*\n\nHola *${nombre}*, gusto en saludarte nuevamente. 😊\n\n¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 17/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
+    const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
+    diasDisponibles.forEach((dia, idx) => {
+      const emoji = emojis[idx] || `${idx + 1}.`;
+      msg += `${emoji} *${dia.diaNombre} ${dia.fechaDisplay}* (${dia.slotsCount} horarios)\n`;
+    });
+    await recordatorios.enviarMensaje(telefono, msg);
   } else {
     // Si no está registrado, pedir su nombre completo
     await guardarEstadoConversacion(telefono, 'esperando_nombre');
@@ -715,39 +721,66 @@ async function iniciarAgendamiento(telefono) {
 async function procesarNombre(telefono, nombre, estado) {
   const datos = JSON.parse(estado.datos || '{}');
   datos.nombre = nombre;
+  
+  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(5);
+  datos.fechasSugeridas = diasDisponibles.map(d => d.fechaISO);
   await guardarEstadoConversacion(telefono, 'esperando_fecha', datos);
-  await recordatorios.enviarMensaje(telefono, `✅ Nombre: ${nombre}\n\n📅 ¿Para que fecha deseas tu cita?\nEscribe la fecha en formato DD/MM/YYYY (ej: 17/06/2026)`);
+
+  let msg = `✅ Nombre: *${nombre}*\n\n📅 ¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 17/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
+  const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
+  diasDisponibles.forEach((dia, idx) => {
+    const emoji = emojis[idx] || `${idx + 1}.`;
+    msg += `${emoji} *${dia.diaNombre} ${dia.fechaDisplay}* (${dia.slotsCount} horarios)\n`;
+  });
+
+  await recordatorios.enviarMensaje(telefono, msg);
 }
 
 async function procesarFecha(telefono, fecha, estado) {
   const datos = JSON.parse(estado.datos || '{}');
-  const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-  if (!regex.test(fecha)) {
-    await recordatorios.enviarMensaje(telefono, '❌ Formato de fecha invalido. Usa DD/MM/YYYY (ej: 17/06/2026)');
-    return;
-  }
-  const [, dia, mes, anio] = fecha.match(regex);
+  const idx = parseInt(fecha.trim()) - 1;
+  const sugeridas = datos.fechasSugeridas || [];
   
-  // Validar que la fecha no sea en el pasado
-  const dateObj = new Date(anio, mes - 1, dia);
-  const hoy = new Date();
-  hoy.setHours(0,0,0,0);
-  if (dateObj < hoy) {
-    await recordatorios.enviarMensaje(telefono, '❌ La fecha no puede ser en el pasado. Escribe una fecha de hoy en adelante (ej: 17/06/2026).');
-    return;
+  let fechaISO = '';
+  let fechaDisplay = '';
+  
+  if (!isNaN(idx) && idx >= 0 && idx < sugeridas.length) {
+    fechaISO = sugeridas[idx];
+    const [anio, mes, dia] = fechaISO.split('-');
+    fechaDisplay = `${dia}/${mes}/${anio}`;
+  } else {
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    if (!regex.test(fecha.trim())) {
+      await recordatorios.enviarMensaje(
+        telefono,
+        '❌ Formato de fecha inválido o número de opción incorrecto. Usa DD/MM/YYYY (ej: 17/06/2026) o responde con el número de opción sugerida.'
+      );
+      return;
+    }
+    const [, dia, mes, anio] = fecha.trim().match(regex);
+    
+    // Validar que la fecha no sea en el pasado
+    const dateObj = new Date(anio, mes - 1, dia);
+    const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+    if (dateObj < hoy) {
+      await recordatorios.enviarMensaje(telefono, '❌ La fecha no puede ser en el pasado. Escribe una fecha de hoy en adelante (ej: 17/06/2026).');
+      return;
+    }
+    fechaISO = `${anio}-${mes}-${dia}`;
+    fechaDisplay = `${dia}/${mes}/${anio}`;
   }
 
-  const fechaISO = `${anio}-${mes}-${dia}`;
   const slots = await recordatorios.obtenerHorariosDisponibles(fechaISO);
   if (slots.length === 0) {
-    await recordatorios.enviarMensaje(telefono, `❌ No hay horarios disponibles para el ${fecha}. Por favor escribe otra fecha.`);
+    await recordatorios.enviarMensaje(telefono, `❌ No hay horarios disponibles para el ${fechaDisplay}. Por favor escribe otra fecha.`);
     return;
   }
   datos.fecha = fechaISO;
-  datos.fechaDisplay = fecha;
+  datos.fechaDisplay = fechaDisplay;
   datos.slots = slots;
   await guardarEstadoConversacion(telefono, 'esperando_seleccion_hora', datos);
-  let mensajeSlots = `📅 *Horarios disponibles para el ${fecha}*:\n\n`;
+  let mensajeSlots = `📅 *Horarios disponibles para el ${fechaDisplay}*:\n\n`;
   slots.forEach((slot, i) => { mensajeSlots += `${i + 1}️⃣ ${slot}\n`; });
   mensajeSlots += `\nResponde con el *numero* del horario que prefieras.`;
   await recordatorios.enviarMensaje(telefono, mensajeSlots);
@@ -859,23 +892,37 @@ async function procesarCancelacion(telefono, respuesta, estado) {
 
 async function procesarReagendandoFecha(telefono, fecha, estado) {
   const datos = JSON.parse(estado.datos || '{}');
-  const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-  if (!regex.test(fecha)) {
-    await recordatorios.enviarMensaje(telefono, '❌ Formato invalido. Usa DD/MM/YYYY (ej: 20/06/2026)');
-    return;
+  const idx = parseInt(fecha.trim()) - 1;
+  const sugeridas = datos.fechasSugeridas || [];
+  
+  let fechaISO = '';
+  let fechaDisplay = '';
+  
+  if (!isNaN(idx) && idx >= 0 && idx < sugeridas.length) {
+    fechaISO = sugeridas[idx];
+    const [anio, mes, dia] = fechaISO.split('-');
+    fechaDisplay = `${dia}/${mes}/${anio}`;
+  } else {
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    if (!regex.test(fecha.trim())) {
+      await recordatorios.enviarMensaje(telefono, '❌ Formato inválido o número de opción incorrecto. Usa DD/MM/YYYY (ej: 20/06/2026) o responde con el número de opción.');
+      return;
+    }
+    const [, dia, mes, anio] = fecha.trim().match(regex);
+    fechaISO = `${anio}-${mes}-${dia}`;
+    fechaDisplay = `${dia}/${mes}/${anio}`;
   }
-  const [, dia, mes, anio] = fecha.match(regex);
-  const fechaISO = `${anio}-${mes}-${dia}`;
+
   const slots = await recordatorios.obtenerHorariosDisponibles(fechaISO);
   if (slots.length === 0) {
-    await recordatorios.enviarMensaje(telefono, `❌ No hay horarios disponibles para el ${fecha}. Escribe otra fecha.`);
+    await recordatorios.enviarMensaje(telefono, `❌ No hay horarios disponibles para el ${fechaDisplay}. Escribe otra fecha.`);
     return;
   }
   datos.nuevaFecha = fechaISO;
-  datos.nuevaFechaDisplay = fecha;
+  datos.nuevaFechaDisplay = fechaDisplay;
   datos.slots = slots;
   await guardarEstadoConversacion(telefono, 'reagendando_seleccion_hora', datos);
-  let msg = `📅 *Horarios disponibles para el ${fecha}*:\n\n`;
+  let msg = `📅 *Horarios disponibles para el ${fechaDisplay}*:\n\n`;
   slots.forEach((slot, i) => { msg += `${i + 1}️⃣ ${slot}\n`; });
   msg += `\nResponde con el *numero* del horario que prefieras.`;
   await recordatorios.enviarMensaje(telefono, msg);
@@ -985,8 +1032,20 @@ async function procesarMensaje(telefono, mensaje) {
     return iniciarAgendamiento(telefono);
   } else if (mensajeLower.includes('ayuda') || mensajeLower.includes('help')) {
     return mostrarAyuda(telefono);
-  } else {
+  } else if (
+    mensajeLower === 'hola' || mensajeLower.startsWith('hola ') || 
+    mensajeLower.includes('buen dia') || mensajeLower.includes('buen día') ||
+    mensajeLower.includes('buenos dias') || mensajeLower.includes('buenos días') ||
+    mensajeLower.includes('buenas tardes') || mensajeLower.includes('buenas noches') ||
+    mensajeLower === 'menu' || mensajeLower === 'menú' || 
+    mensajeLower === 'comenzar' || mensajeLower === 'inicio' || 
+    mensajeLower === 'empezar'
+  ) {
     return mostrarMenu(telefono);
+  } else {
+    // Si no es un comando ni un saludo conocido, no hacemos nada (evita spam al chatear con el doctor)
+    console.log(`🔇 Mensaje no reconocido de ${telefono} ("${mensaje}"). Chatbot en silencio.`);
+    return;
   }
 }
 

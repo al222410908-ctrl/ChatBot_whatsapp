@@ -634,26 +634,29 @@ Si deseas agendar una nueva cita, responde *"cita"* o *"agendar"* y te ayudaremo
         return { processed: true, action: 'cancelled', citaId };
 
       } else if (accion === 'reagendar') {
+        const diasDisponibles = await obtenerProximosDiasDisponibles(5);
         await new Promise((resolve, reject) => {
           db.run(
             `INSERT OR REPLACE INTO conversaciones (telefono, estado, datos, actualizado_en)
              VALUES (?, 'reagendando_fecha', ?, datetime('now'))`,
-            [telefono, JSON.stringify({ citaOriginalId: citaId, nombre: mensajePendiente.paciente_nombre, motivo: mensajePendiente.motivo })],
+            [telefono, JSON.stringify({
+              citaOriginalId: citaId,
+              nombre: mensajePendiente.paciente_nombre,
+              motivo: mensajePendiente.motivo,
+              fechasSugeridas: diasDisponibles.map(d => d.fechaISO)
+            })],
             (err) => { if (err) reject(err); else resolve(); }
           );
         });
 
-        await self.enviarMensaje(
-          telefono,
-          `🔄 *Reagendar Cita*
+        let msg = `🔄 *Reagendar Cita*\n\nHola ${mensajePendiente.paciente_nombre.trim()}, vamos a agendar una nueva cita para reemplazar la del ${mensajePendiente.fecha} a las ${mensajePendiente.hora.substring(0, 5)}.\n\n📅 ¿Para qué fecha deseas tu nueva cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 20/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
+        const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
+        diasDisponibles.forEach((dia, idx) => {
+          const emoji = emojis[idx] || `${idx + 1}.`;
+          msg += `${emoji} *${dia.diaNombre} ${dia.fechaDisplay}* (${dia.slotsCount} horarios)\n`;
+        });
 
-Hola ${mensajePendiente.paciente_nombre.trim()}, vamos a agendar una nueva cita para reemplazar la del ${mensajePendiente.fecha} a las ${mensajePendiente.hora}.
-
-📅 ¿Para qué fecha deseas tu nueva cita?
-Escribe la fecha en formato DD/MM/YYYY (ej: 20/06/2026)`,
-          'bot',
-          true
-        );
+        await self.enviarMensaje(telefono, msg, 'bot', true);
 
         console.log(`🔄 Cita ${citaId} en proceso de REAGENDAMIENTO por ${telefono}`);
         return { processed: true, action: 'rescheduling', citaId };
@@ -808,6 +811,31 @@ Puedes responder con el número o con tus propias palabras.`,
     return slots;
   };
 
+  // ─── Obtener los próximos días disponibles con slots ─────────
+  const obtenerProximosDiasDisponibles = async (cantidad = 5) => {
+    const dias = [];
+    const hoy = new Date();
+    // Revisar próximos 14 días para encontrar días con slots disponibles
+    for (let i = 0; i < 14; i++) {
+      const d = new Date();
+      d.setDate(hoy.getDate() + i);
+      const fechaISO = obtenerFechaLocal(d);
+      const slots = await obtenerHorariosDisponibles(fechaISO);
+      if (slots.length > 0) {
+        const nombreDia = d.toLocaleDateString('es-ES', { weekday: 'long' });
+        const diaNombre = nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1);
+        dias.push({
+          fechaISO,
+          fechaDisplay: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`,
+          diaNombre,
+          slotsCount: slots.length,
+        });
+        if (dias.length >= cantidad) break;
+      }
+    }
+    return dias;
+  };
+
   // ─── Verificar y enviar encuestas de satisfacción ────────────
   const verificarYEnviarEncuestas = async () => {
     try {
@@ -922,6 +950,7 @@ Puedes responder con el número o con tus propias palabras.`,
   self.interpretarRespuesta = interpretarRespuesta;
   self.normalizarTelefono = normalizarTelefono;
   self.obtenerHorariosDisponibles = obtenerHorariosDisponibles;
+  self.obtenerProximosDiasDisponibles = obtenerProximosDiasDisponibles;
   self.verificarYEnviarEncuestas = verificarYEnviarEncuestas;
   self.estaEnVentanaSegura = estaEnVentanaSegura;
   self.delayAleatorio = delayAleatorio;
