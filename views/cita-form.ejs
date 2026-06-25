@@ -11,9 +11,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Estilos compartidos -->
-    <link rel="stylesheet" href="/css/app.css">
-</head>
-<body>
+        <link rel="stylesheet" href="/css/app.css">
     <script>
         (function() {
             const t = localStorage.getItem('theme');
@@ -21,8 +19,13 @@
                 document.documentElement.setAttribute('data-theme', 'dark');
                 document.documentElement.setAttribute('data-bs-theme', 'dark');
             }
+            const c = localStorage.getItem('color-theme') || 'clinico';
+            document.documentElement.setAttribute('data-color-theme', c);
         })();
     </script>
+</head>
+<body>
+    
 
     <div class="container-fluid">
         <div class="row flex-nowrap">

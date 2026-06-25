@@ -21,6 +21,8 @@
 
   /* Temas de Estado */
   --color-primary:    #2563eb; /* Azul Rey Premium */
+  --color-primary-soft: rgba(37, 99, 235, 0.08);
+  --color-primary-hover-soft: rgba(37, 99, 235, 0.05);
   --color-success:    #10b981; /* Verde esmeralda */
   --color-danger:     #ef4444; /* Rojo */
   --color-warning:    #f59e0b; /* Ámbar */
@@ -172,7 +174,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar .nav-link.active {
-  background-color: rgba(37, 99, 235, 0.08);
+  background-color: var(--color-primary-soft);
   color: var(--color-primary);
   font-weight: 600;
 }
@@ -612,4 +614,72 @@ h1, h2, h3, h4, h5, h6 {
 
 [data-theme="dark"] .btn-close {
   filter: invert(1) grayscale(1) brightness(2);
+}
+
+/* ============================================================
+   Temas Personalizados & Alertas de Feedback
+   ============================================================ */
+
+/* 1. Tema Lavanda Relax */
+[data-color-theme="lavanda"] {
+  --color-primary: #8b5cf6; /* Morado Lavanda */
+  --color-primary-soft: rgba(139, 92, 246, 0.08);
+  --color-primary-hover-soft: rgba(139, 92, 246, 0.05);
+}
+[data-theme="dark"][data-color-theme="lavanda"] {
+  --color-primary: #a78bfa;
+  --color-primary-soft: rgba(167, 139, 250, 0.12);
+  --color-primary-hover-soft: rgba(167, 139, 250, 0.08);
+}
+
+/* 2. Tema Bosque Eco */
+[data-color-theme="bosque"] {
+  --color-primary: #059669; /* Verde Bosque */
+  --color-primary-soft: rgba(5, 150, 105, 0.08);
+  --color-primary-hover-soft: rgba(5, 150, 105, 0.05);
+}
+[data-theme="dark"][data-color-theme="bosque"] {
+  --color-primary: #34d399;
+  --color-primary-soft: rgba(52, 211, 153, 0.12);
+  --color-primary-hover-soft: rgba(52, 211, 153, 0.08);
+}
+
+/* 3. Tema Cyberpunk */
+[data-color-theme="cyberpunk"] {
+  --color-primary: #ec4899; /* Rosa Cyberpunk */
+  --color-primary-soft: rgba(236, 72, 153, 0.08);
+  --color-primary-hover-soft: rgba(236, 72, 153, 0.05);
+}
+[data-theme="dark"][data-color-theme="cyberpunk"] {
+  --color-primary: #f472b6;
+  --color-primary-soft: rgba(244, 114, 182, 0.12);
+  --color-primary-hover-soft: rgba(244, 114, 182, 0.08);
+}
+
+/* 4. Tema OLED Dark (Fondo negro absoluto) */
+[data-color-theme="oled"] {
+  --color-primary: #8b5cf6; /* Púrpura */
+  --color-primary-soft: rgba(139, 92, 246, 0.08);
+  --color-primary-hover-soft: rgba(139, 92, 246, 0.05);
+}
+[data-theme="dark"][data-color-theme="oled"] {
+  --background-color: #000000;
+  --surface-color: #090a0f;
+  --border-color: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.1);
+  --color-primary: #c084fc;
+  --color-primary-soft: rgba(192, 132, 252, 0.15);
+  --color-primary-hover-soft: rgba(192, 132, 252, 0.08);
+  --bs-body-bg-rgb: 0, 0, 0;
+}
+
+/* Animación pulsante para el botón de Atención Inmediata */
+.animate-pulse-btn {
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  animation: pulse-danger-animation 1.6s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+@keyframes pulse-danger-animation {
+  to {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
 }

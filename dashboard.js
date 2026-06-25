@@ -586,6 +586,22 @@ async function inicializarBD() {
   await addColumn('mensajes_pendientes', 'intentos INTEGER DEFAULT 0');
   await addColumn('mensajes_pendientes', 'ultimo_intento_en DATETIME');
   await addColumn('historial_mensajes', 'leido INTEGER DEFAULT 0');
+  await addColumn('configuraciones', 'mensaje_bienvenida TEXT');
+  await addColumn('configuraciones', 'mensaje_ayuda TEXT');
+
+  const defaultBienvenida = `🏥 *Chatbot de Citas Medicas*\n\nHola, soy tu asistente virtual. ¿En que puedo ayudarte?\n\n📅 *Agendar cita* - Escribe "cita" o "agendar"\n📋 *Mis citas* - Escribe "mis citas" o "consultar"\n❌ *Cancelar cita* - Escribe "cancelar"\n❓ *Ayuda* - Escribe "ayuda"\n\nEscribe una opcion para comenzar.`;
+  const defaultAyuda = `❓ *Ayuda - Chatbot de Citas*\n\n📅 *Agendar cita:*\n1. Escribe "cita" o "agendar"\n2. Sigue las instrucciones paso a paso\n3. Confirma tu cita\n\n📋 *Consultar citas:*\n- Escribe "mis citas" para ver tus proximas citas\n\n❌ *Cancelar cita:*\n- Escribe "cancelar" para cancelar una cita\n\n🔄 *Reagendar cita:*\n- Cuando recibas un recordatorio, responde "3" o "reagendar"\n\n💡 *Tips:*\n- Usa fechas en formato DD/MM/YYYY\n- Responde a recordatorios con: 1 (Confirmar), 2 (Cancelar), 3 (Reagendar)`;
+
+  await new Promise((resolve) => {
+    db.run(
+      `UPDATE configuraciones SET
+        mensaje_bienvenida = COALESCE(mensaje_bienvenida, ?),
+        mensaje_ayuda = COALESCE(mensaje_ayuda, ?)
+       WHERE id = 1`,
+      [defaultBienvenida, defaultAyuda],
+      () => resolve()
+    );
+  });
 
   console.log('💾 Base de datos inicializada');
 }
@@ -655,13 +671,15 @@ async function limpiarEstadoConversacion(telefono) {
 }
 
 async function mostrarMenu(telefono) {
-  const mensaje = `🏥 *Chatbot de Citas Medicas*\n\nHola, soy tu asistente virtual. ¿En que puedo ayudarte?\n\n📅 *Agendar cita* - Escribe "cita" o "agendar"\n📋 *Mis citas* - Escribe "mis citas" o "consultar"\n❌ *Cancelar cita* - Escribe "cancelar"\n❓ *Ayuda* - Escribe "ayuda"\n\nEscribe una opcion para comenzar.`;
+  const config = await dbGet('SELECT mensaje_bienvenida FROM configuraciones LIMIT 1');
+  const mensaje = config?.mensaje_bienvenida || `🏥 *Chatbot de Citas Medicas*\n\nHola, soy tu asistente virtual. ¿En que puedo ayudarte?\n\n📅 *Agendar cita* - Escribe "cita" o "agendar"\n📋 *Mis citas* - Escribe "mis citas" o "consultar"\n❌ *Cancelar cita* - Escribe "cancelar"\n❓ *Ayuda* - Escribe "ayuda"\n\nEscribe una opcion para comenzar.`;
   await recordatorios.enviarMensaje(telefono, mensaje);
   await limpiarEstadoConversacion(telefono);
 }
 
 async function mostrarAyuda(telefono) {
-  const mensaje = `❓ *Ayuda - Chatbot de Citas*\n\n📅 *Agendar cita:*\n1. Escribe "cita" o "agendar"\n2. Sigue las instrucciones paso a paso\n3. Confirma tu cita\n\n📋 *Consultar citas:*\n- Escribe "mis citas" para ver tus proximas citas\n\n❌ *Cancelar cita:*\n- Escribe "cancelar" para cancelar una cita\n\n🔄 *Reagendar cita:*\n- Cuando recibas un recordatorio, responde "3" o "reagendar"\n\n💡 *Tips:*\n- Usa fechas en formato DD/MM/YYYY\n- Responde a recordatorios con: 1 (Confirmar), 2 (Cancelar), 3 (Reagendar)`;
+  const config = await dbGet('SELECT mensaje_ayuda FROM configuraciones LIMIT 1');
+  const mensaje = config?.mensaje_ayuda || `❓ *Ayuda - Chatbot de Citas*\n\n📅 *Agendar cita:*\n1. Escribe "cita" o "agendar"\n2. Sigue las instrucciones paso a paso\n3. Confirma tu cita\n\n📋 *Consultar citas:*\n- Escribe "mis citas" para ver tus proximas citas\n\n❌ *Cancelar cita:*\n- Escribe "cancelar" para cancelar una cita\n\n🔄 *Reagendar cita:*\n- Cuando recibas un recordatorio, responde "3" o "reagendar"\n\n💡 *Tips:*\n- Usa fechas en formato DD/MM/YYYY\n- Responde a recordatorios con: 1 (Confirmar), 2 (Cancelar), 3 (Reagendar)`;
   await recordatorios.enviarMensaje(telefono, mensaje);
 }
 
@@ -1419,16 +1437,16 @@ app.get('/configuracion', async (req, res) => {
 
 app.post('/configuracion', async (req, res) => {
   try {
-    const { dias_laborales, hora_inicio, hora_fin, duracion_cita, direccion, google_maps_url, indicaciones } = req.body;
+    const { dias_laborales, hora_inicio, hora_fin, duracion_cita, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda } = req.body;
     let diasStr = '[]';
     if (dias_laborales) {
       const arr = Array.isArray(dias_laborales) ? dias_laborales.map(Number) : [Number(dias_laborales)];
       diasStr = JSON.stringify(arr);
     }
     await dbRun(
-      `UPDATE configuraciones SET dias_laborales=?, hora_inicio=?, hora_fin=?, duracion_cita=?, direccion=?, google_maps_url=?, indicaciones=?
+      `UPDATE configuraciones SET dias_laborales=?, hora_inicio=?, hora_fin=?, duracion_cita=?, direccion=?, google_maps_url=?, indicaciones=?, mensaje_bienvenida=?, mensaje_ayuda=?
        WHERE id = (SELECT id FROM configuraciones LIMIT 1)`,
-      [diasStr, hora_inicio, hora_fin, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones]
+      [diasStr, hora_inicio, hora_fin, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda]
     );
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
     res.render('configuracion', { config, success: true, message: 'Configuracion guardada correctamente.' });
@@ -1498,7 +1516,15 @@ app.get('/api/analytics', async (req, res) => {
       FROM citas GROUP BY strftime('%w', fecha) ORDER BY strftime('%w', fecha)
     `);
 
-    res.json({ citasPorMes, resumen, ratingPorMes, distribCalificaciones, topPacientes, citasPorDia });
+    const citasValoradas = await dbAll(`
+      SELECT c.id, c.fecha, c.hora, c.calificacion, c.notas, p.nombre as paciente_nombre, p.telefono as paciente_telefono
+      FROM citas c
+      JOIN pacientes p ON c.paciente_id = p.id
+      WHERE c.calificacion IS NOT NULL
+      ORDER BY c.fecha DESC, c.hora DESC
+    `);
+
+    res.json({ citasPorMes, resumen, ratingPorMes, distribCalificaciones, topPacientes, citasPorDia, citasValoradas });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

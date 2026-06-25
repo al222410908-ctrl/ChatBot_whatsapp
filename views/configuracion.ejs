@@ -11,7 +11,18 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Estilos compartidos -->
-    <link rel="stylesheet" href="/css/app.css">
+        <link rel="stylesheet" href="/css/app.css">
+    <script>
+        (function() {
+            const t = localStorage.getItem('theme');
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+            const c = localStorage.getItem('color-theme') || 'clinico';
+            document.documentElement.setAttribute('data-color-theme', c);
+        })();
+    </script>
     <style>
         /* Estilos específicos para los checkboxes de días */
         .day-checkbox { display: none; }
@@ -54,15 +65,7 @@
     </style>
 </head>
 <body>
-    <script>
-        (function() {
-            const t = localStorage.getItem('theme');
-            if (t === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                document.documentElement.setAttribute('data-bs-theme', 'dark');
-            }
-        })();
-    </script>
+    
 
     <div class="container-fluid">
         <div class="row flex-nowrap">
@@ -230,6 +233,69 @@
                         </div>
                     </div>
 
+                    <!-- Fila 2: Personalización del Chatbot -->
+                    <div class="row g-4 mt-1">
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-header bg-transparent border-0 pt-4 pb-0">
+                                    <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-robot me-2"></i> Personalización del Chatbot de WhatsApp</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-start">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="mensaje_bienvenida" class="form-label fw-semibold">Mensaje de Bienvenida / Menú Principal</label>
+                                            <textarea class="form-control" id="mensaje_bienvenida" name="mensaje_bienvenida" rows="6" required><%= config.mensaje_bienvenida %></textarea>
+                                            <div class="form-text mt-2">
+                                                <i class="bi bi-info-circle"></i> Mensaje de inicio del chatbot. Soporta negritas de WhatsApp (ej: *texto*) y saltos de línea.
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="mensaje_ayuda" class="form-label fw-semibold">Mensaje de Ayuda y Soporte</label>
+                                            <textarea class="form-control" id="mensaje_ayuda" name="mensaje_ayuda" rows="6" required><%= config.mensaje_ayuda %></textarea>
+                                            <div class="form-text mt-2">
+                                                <i class="bi bi-info-circle"></i> Mensaje que se envía cuando el paciente escribe "ayuda" o "help".
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fila 3: Personalización de Temas Visuales (Branding) -->
+                    <div class="row g-4 mt-1">
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-header bg-transparent border-0 pt-4 pb-0">
+                                    <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-palette-fill me-2"></i> Tema Visual y Personalización (Branding)</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-start align-items-center">
+                                        <div class="col-md-6 mb-3 mb-md-0">
+                                            <label for="color-theme-select" class="form-label fw-semibold">Seleccionar Tema de Color</label>
+                                            <select class="form-select" id="color-theme-select" onchange="changeColorTheme(this.value)">
+                                                <option value="clinico">🩺 Clínico Clásico (Azul)</option>
+                                                <option value="lavanda">🪻 Lavanda Relax (Morado)</option>
+                                                <option value="bosque">🌲 Bosque Eco (Verde)</option>
+                                                <option value="cyberpunk">🌸 Cyberpunk Neon (Rosa)</option>
+                                                <option value="oled">🌌 OLED Dark (Negro Absoluto)</option>
+                                            </select>
+                                            <div class="form-text mt-2">
+                                                Elige una paleta de colores para tu consultorio. El tema se aplicará automáticamente a todas las páginas de gestión.
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="p-3 rounded border text-muted" id="theme-preview-card" style="font-size:0.85rem; background-color: var(--surface-color); border-color: var(--border-color);">
+                                                <strong>Vista Previa del Tema:</strong><br>
+                                                El color primario del sistema y la cabecera se adaptarán de acuerdo a la paleta seleccionada. Haz clic para experimentar con los diferentes estilos.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Botón de Envío -->
                     <div class="row mt-4">
                         <div class="col-12 text-end mb-4">
@@ -260,11 +326,47 @@
             localStorage.setItem('theme', isDark ? 'light' : 'dark');
         }
 
+        function changeColorTheme(val) {
+            document.documentElement.setAttribute('data-color-theme', val);
+            localStorage.setItem('color-theme', val);
+            updateThemePreviewCard(val);
+        }
+
+        function updateThemePreviewCard(val) {
+            const card = document.getElementById('theme-preview-card');
+            if (!card) return;
+            let text = '';
+            let style = '';
+            if (val === 'clinico') {
+                text = '🩺 <strong>Clínico Clásico</strong>: Estilo médico clásico, formal y profesional basado en azul cobalto.';
+                style = 'border-left: 5px solid #2563eb; background-color: rgba(37, 99, 235, 0.03); border-color: var(--border-color);';
+            } else if (val === 'lavanda') {
+                text = '🪻 <strong>Lavanda Relax</strong>: Atmósfera calmada y moderna en tonos lila, ideal para psicología y rehabilitación.';
+                style = 'border-left: 5px solid #8b5cf6; background-color: rgba(139, 92, 246, 0.03); border-color: var(--border-color);';
+            } else if (val === 'bosque') {
+                text = '🌲 <strong>Bosque Eco</strong>: Diseño orgánico en tonos verdes esmeralda, ideal para consultorios holísticos y nutrición.';
+                style = 'border-left: 5px solid #059669; background-color: rgba(5, 150, 105, 0.03); border-color: var(--border-color);';
+            } else if (val === 'cyberpunk') {
+                text = '🌸 <strong>Cyberpunk Neon</strong>: Combinación vibrante de rosa y magenta neón para una estética audaz y de vanguardia.';
+                style = 'border-left: 5px solid #ec4899; background-color: rgba(236, 72, 153, 0.03); border-color: var(--border-color);';
+            } else if (val === 'oled') {
+                text = '🌌 <strong>OLED Dark</strong>: Negro puro y contrastes violeta. Optimizado para pantallas OLED y reducción de fatiga visual.';
+                style = 'border-left: 5px solid #c084fc; background-color: rgba(192, 132, 252, 0.03); border-color: var(--border-color);';
+            }
+            card.style = style;
+            card.innerHTML = text;
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('theme') === 'dark') {
                 const btn = document.getElementById('dark-toggle-btn');
                 if (btn) btn.innerHTML = '<i class="bi bi-sun-fill" id="dark-icon"></i> Modo Claro';
             }
+            const currentTheme = localStorage.getItem('color-theme') || 'clinico';
+            const select = document.getElementById('color-theme-select');
+            if (select) select.value = currentTheme;
+            updateThemePreviewCard(currentTheme);
+
             if (window.lucide) window.lucide.createIcons();
         });
 

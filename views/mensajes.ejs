@@ -9,7 +9,18 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <!-- Estilos compartidos -->
-    <link rel="stylesheet" href="/css/app.css">
+        <link rel="stylesheet" href="/css/app.css">
+    <script>
+        (function() {
+            const t = localStorage.getItem('theme');
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+            const c = localStorage.getItem('color-theme') || 'clinico';
+            document.documentElement.setAttribute('data-color-theme', c);
+        })();
+    </script>
     <style>
         .msg-preview { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
         .template-btn {
@@ -52,15 +63,7 @@
     </style>
 </head>
 <body>
-    <script>
-        (function() {
-            const t = localStorage.getItem('theme');
-            if (t === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                document.documentElement.setAttribute('data-bs-theme', 'dark');
-            }
-        })();
-    </script>
+    
 <div class="container-fluid">
     <div class="row flex-nowrap">
         <!-- Sidebar -->

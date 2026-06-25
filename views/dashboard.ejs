@@ -14,7 +14,18 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Estilos compartidos -->
-    <link rel="stylesheet" href="/css/app.css">
+        <link rel="stylesheet" href="/css/app.css">
+    <script>
+        (function() {
+            const t = localStorage.getItem('theme');
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+            const c = localStorage.getItem('color-theme') || 'clinico';
+            document.documentElement.setAttribute('data-color-theme', c);
+        })();
+    </script>
     <style>
         /* ── Estilos específicos del Dashboard ── */
         .stat-card {

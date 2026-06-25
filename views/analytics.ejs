@@ -13,7 +13,18 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Estilos compartidos -->
-    <link rel="stylesheet" href="/css/app.css">
+        <link rel="stylesheet" href="/css/app.css">
+    <script>
+        (function() {
+            const t = localStorage.getItem('theme');
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+            const c = localStorage.getItem('color-theme') || 'clinico';
+            document.documentElement.setAttribute('data-color-theme', c);
+        })();
+    </script>
     <style>
         /* ── Stat Cards de Analytics ──────────────────────────── */
         .analytics-stat-card {
@@ -111,15 +122,7 @@
     </style>
 </head>
 <body>
-    <script>
-        (function() {
-            const t = localStorage.getItem('theme');
-            if (t === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                document.documentElement.setAttribute('data-bs-theme', 'dark');
-            }
-        })();
-    </script>
+    
 
     <div class="container-fluid">
         <div class="row flex-nowrap">
@@ -237,6 +240,30 @@
                         <div id="top-patients"></div>
                     </div>
 
+                    <!-- Centro de Reseñas y Feedback (Feedback Center) -->
+                    <div class="chart-card mb-4">
+                        <div class="chart-title mb-1">⭐ Centro de Reseñas y Opiniones (Feedback Center)</div>
+                        <div class="chart-sub">Desglose de calificaciones de pacientes y atención prioritaria para calificaciones bajas</div>
+                        
+                        <div class="row mt-4">
+                            <!-- Columna Izquierda: Amazon style Rating distribution bars -->
+                            <div class="col-lg-5 mb-4 mb-lg-0 border-end pe-lg-4">
+                                <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-fill text-warning me-1"></i> Distribución de Estrellas</h6>
+                                <div id="amazon-distribution-bars">
+                                    <!-- Dynamic bars go here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Columna Derecha: List of Rated Appointments / Reviews -->
+                            <div class="col-lg-7 ps-lg-4">
+                                <h6 class="fw-bold mb-3"><i class="bi bi-chat-square-text-fill text-primary me-1"></i> Reseñas Recientes</h6>
+                                <div id="rated-appointments-list" style="max-height: 400px; overflow-y: auto; padding-right: 8px;">
+                                    <!-- Dynamic review list goes here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -336,6 +363,7 @@
             renderDias(data.citasPorDia);
             renderDistrib(data.distribCalificaciones);
             renderTopPacientes(data.topPacientes);
+            renderFeedbackCenter(data.distribCalificaciones, data.citasValoradas);
         }
 
         function renderStats(r) {
@@ -454,6 +482,90 @@
                     <span class="patient-badge">${p.total_citas} cita${p.total_citas != 1 ? 's' : ''}</span>
                 </div>
             `).join('');
+        }
+
+        function renderFeedbackCenter(distrib, citasValoradas) {
+            // 1. Render Amazon-style progress bars
+            const total = distrib.reduce((a, b) => a + b.cantidad, 0);
+            const stars = [5, 4, 3, 2, 1];
+            let barsHTML = '';
+            
+            stars.forEach(s => {
+                const found = distrib.find(d => d.calificacion === s);
+                const count = found ? found.cantidad : 0;
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                
+                barsHTML += `
+                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 0.85rem;">
+                        <span style="width: 75px; font-weight: 550;" class="text-nowrap">${s} estrella${s > 1 ? 's' : ''}</span>
+                        <div class="progress flex-grow-1" style="height: 10px; border-radius: 5px; background-color: var(--border-color); overflow: hidden;">
+                            <div class="progress-bar" style="width: ${pct}%; background-color: #ffb703; border-radius: 5px; transition: width 0.5s ease;"></div>
+                        </div>
+                        <span style="width: 40px; font-weight: 550;" class="text-end text-muted">${pct}%</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); width: 25px;" class="text-end">(${count})</span>
+                    </div>
+                `;
+            });
+            document.getElementById('amazon-distribution-bars').innerHTML = barsHTML;
+
+            // 2. Render reviews list
+            const container = document.getElementById('rated-appointments-list');
+            if (!citasValoradas || citasValoradas.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center py-4" style="font-size: 13px;"><i class="bi bi-chat-square-x me-1"></i> Aún no se han recibido opiniones de pacientes.</p>';
+                return;
+            }
+
+            container.innerHTML = citasValoradas.map(c => {
+                const rating = c.calificacion;
+                const starStr = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+                const colorClass = rating >= 4 ? 'text-success' : rating === 3 ? 'text-warning' : 'text-danger';
+                
+                // Si califica con 1 o 2, agregamos el botón de atención inmediata con animación de pulso
+                let actionBtn = '';
+                if (rating <= 2) {
+                    actionBtn = `
+                        <a href="/chat?phone=${c.paciente_telefono}" class="btn btn-danger btn-sm text-white ms-auto d-flex align-items-center gap-1 py-1 px-2 animate-pulse-btn" style="font-size:0.75rem; font-weight:600; border: none; border-radius: 4px;">
+                            <i class="bi bi-chat-fill"></i> Atención Inmediata
+                        </a>
+                    `;
+                } else {
+                    actionBtn = `
+                        <a href="/chat?phone=${c.paciente_telefono}" class="btn btn-outline-secondary btn-sm ms-auto py-1 px-2" style="font-size:0.75rem; border-radius: 4px;">
+                            <i class="bi bi-chat-text"></i> Chatear
+                        </a>
+                    `;
+                }
+
+                // Formatear fecha
+                const [yyyy, mm, dd] = c.fecha.split('-');
+                const fechaFormateada = `${dd}/${mm}/${yyyy}`;
+
+                // Mostrar notas de la consulta como comentario
+                const comentario = c.notes || c.notas ? (c.notes || c.notas).trim() : '<span class="text-muted italic" style="font-style: italic;">Sin comentarios adicionales de consulta.</span>';
+
+                return `
+                    <div class="patient-row flex-wrap align-items-center py-3" style="border-bottom: 1px solid var(--border-color);">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0" style="max-width: 70%;">
+                            <div class="patient-avatar" style="background: ${rating <= 2 ? 'linear-gradient(135deg, #ef4444, #f87171)' : 'linear-gradient(135deg, #4f46e5, #7c3aed)'}">
+                                ${c.paciente_nombre.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="patient-name text-truncate" style="font-size:0.88rem; font-weight: 600;">${c.paciente_nombre}</div>
+                                <div class="patient-tel text-muted" style="font-size:0.75rem;">+${c.paciente_telefono} • Cita: ${fechaFormateada} ${c.hora.substring(0, 5)}</div>
+                                <div class="mt-1 text-main text-wrap" style="font-size: 0.82rem; line-height: 1.4;">
+                                    ${comentario}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-2 ms-auto">
+                            <span class="${colorClass}" style="font-size: 0.95rem; font-weight: 700; letter-spacing: 1px;">
+                                ${starStr}
+                            </span>
+                            ${actionBtn}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         loadAnalytics();
