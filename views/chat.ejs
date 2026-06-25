@@ -473,6 +473,60 @@
     <script>
         let selectedPhone = null;
 
+        // Solicitar permiso de notificaciones nativas en el navegador
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+
+        // Sintetizador de audio chime clínico agradable
+        function playNotificationSound() {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                
+                const osc1 = context.createOscillator();
+                const gain1 = context.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(523.25, context.currentTime); // C5
+                gain1.gain.setValueAtTime(0.08, context.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.25);
+                osc1.connect(gain1);
+                gain1.connect(context.destination);
+                osc1.start();
+                osc1.stop(context.currentTime + 0.25);
+
+                setTimeout(() => {
+                    const osc2 = context.createOscillator();
+                    const gain2 = context.createGain();
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(659.25, context.currentTime); // E5
+                    gain2.gain.setValueAtTime(0.08, context.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.4);
+                    osc2.connect(gain2);
+                    gain2.connect(context.destination);
+                    osc2.start();
+                    osc2.stop(context.currentTime + 0.4);
+                }, 80);
+            } catch (e) {
+                console.warn('AudioContext no soportado:', e);
+            }
+        }
+
+        // Notificación nativa push
+        function sendNativeNotification(title, body, phone) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                const notification = new Notification(title, {
+                    body: body,
+                    tag: 'wasap-msg',
+                    renotify: true
+                });
+                notification.onclick = () => {
+                    window.focus();
+                    const contactEl = document.querySelector(`.contact-item[data-phone="${phone}"]`);
+                    if (contactEl) selectContact(contactEl);
+                };
+            }
+        }
+
         // Búsqueda de contactos
         document.getElementById('search-contacts').addEventListener('input', function(e) {
             const query = e.target.value.toLowerCase().trim();
@@ -725,8 +779,15 @@
                 scrollToBottom();
             }
 
-            // Si el mensaje es recibido de paciente y no es el chat seleccionado, actualizar unread dot y badge local
+            // Si el mensaje es recibido de paciente, reproducir sonido y notificar
             if (remitente === 'paciente') {
+                playNotificationSound();
+                if (document.hidden) {
+                    const contactEl = document.querySelector(`.contact-item[data-phone="${phone}"]`);
+                    const nombrePaciente = contactEl ? contactEl.dataset.name : `+${phone}`;
+                    sendNativeNotification(`💬 Mensaje de ${nombrePaciente}`, text, phone);
+                }
+
                 if (selectedPhone !== phone) {
                     const dot = document.getElementById('unread-dot');
                     if (dot) dot.style.display = 'inline-block';

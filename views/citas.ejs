@@ -13,6 +13,8 @@
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/es.global.min.js" defer></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <style>
         /* Ajustes específicos para la página de citas */
@@ -484,10 +486,66 @@
             var calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 locale: 'es',
+                editable: true,
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
                     right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                eventDrop: async function(info) {
+                    const citaId = info.event.id;
+                    const props = info.event.extendedProps;
+                    
+                    const newStart = info.event.start;
+                    const yyyy = newStart.getFullYear();
+                    const mm = String(newStart.getMonth() + 1).padStart(2, '0');
+                    const dd = String(newStart.getDate()).padStart(2, '0');
+                    const fecha = `${yyyy}-${mm}-${dd}`;
+                    
+                    const hh = String(newStart.getHours()).padStart(2, '0');
+                    const min = String(newStart.getMinutes()).padStart(2, '0');
+                    const hora = `${hh}:${min}:00`;
+
+                    // Mostrar indicador de carga premium
+                    Swal.fire({
+                        title: 'Procesando reprogramación',
+                        text: `Moviendo la cita de ${props.paciente}...`,
+                        icon: 'info',
+                        allowOutsideClick: false,
+                        showConfirmButton: false,
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+
+                    try {
+                        const response = await fetch(`/api/citas/${citaId}/reprogramar`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fecha, hora })
+                        });
+                        const resData = await response.json();
+                        
+                        if (resData.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Cita Reprogramada!',
+                                html: `La cita de <strong>${props.paciente}</strong> se ha reprogramado correctamente:<br><br>📅 <strong>${dd}/${mm}/${yyyy}</strong> a las ⏰ <strong>${hh}:${min} hrs</strong>`,
+                                timer: 4000,
+                                showConfirmButton: true,
+                                confirmButtonColor: '#4f46e5'
+                            });
+                        } else {
+                            throw new Error(resData.error || 'Error al reprogramar en servidor');
+                        }
+                    } catch (error) {
+                        console.error('Error al reprogramar la cita:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error de Reprogramación',
+                            text: 'No se pudo actualizar la cita en la base de datos. Se revertirá el cambio.',
+                            confirmButtonColor: '#ef4444'
+                        });
+                        info.revert();
+                    }
                 },
                 events: [
                     <% citas.forEach(cita => { 

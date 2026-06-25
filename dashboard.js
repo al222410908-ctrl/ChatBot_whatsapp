@@ -1398,6 +1398,17 @@ app.post('/chat/enviar', async (req, res) => {
   }
 });
 
+app.post('/api/citas/:id/reprogramar', async (req, res) => {
+  try {
+    const { fecha, hora } = req.body;
+    const citaId = req.params.id;
+    await dbRun('UPDATE citas SET fecha = ?, hora = ? WHERE id = ?', [fecha, hora, citaId]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ─── Configuracion ────────────────────────────────────────────
 app.get('/configuracion', async (req, res) => {
   try {
