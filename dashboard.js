@@ -666,8 +666,50 @@ async function mostrarAyuda(telefono) {
 }
 
 async function iniciarAgendamiento(telefono) {
-  await guardarEstadoConversacion(telefono, 'esperando_nombre');
-  await recordatorios.enviarMensaje(telefono, `📅 *Agendar Nueva Cita*\n\nVamos a agendar tu cita. Primero, ¿cual es tu nombre completo?\n\nEscribe tu nombre para continuar.`);
+  // 1. Verificar si el paciente ya tiene una cita pendiente o confirmada futura
+  const hoyStr = getLocalDateString();
+  const citaExistente = await new Promise((resolve) => {
+    db.get(
+      `SELECT c.fecha, c.hora, c.estado FROM citas c
+       JOIN pacientes p ON c.paciente_id = p.id
+       WHERE p.telefono = ? AND c.fecha >= ? AND c.estado IN ('pendiente', 'confirmada')
+       ORDER BY c.fecha ASC, c.hora ASC LIMIT 1`,
+      [telefono, hoyStr],
+      (err, row) => resolve(row)
+    );
+  });
+
+  if (citaExistente) {
+    const fechaFormateada = citaExistente.fecha.split('-').reverse().join('/');
+    const estadoStr = citaExistente.estado === 'confirmada' ? 'confirmada' : 'pendiente de confirmación';
+    await recordatorios.enviarMensaje(
+      telefono,
+      `⚠️ *Ya tienes una cita programada*\n\nVeo que tienes una cita *${estadoStr}* para el *${fechaFormateada}* a las *${citaExistente.hora.substring(0, 5)}*.\n\nSi deseas cambiarla o reagendarla, responde *"cancelar"* primero para cancelar tu cita actual y liberar tu horario, o escribe *"menu"* para volver al menú principal.`
+    );
+    return;
+  }
+
+  // 2. Verificar si el paciente ya está registrado en el sistema
+  const paciente = await new Promise((resolve) => {
+    db.get('SELECT nombre FROM pacientes WHERE telefono = ?', [telefono], (err, row) => resolve(row));
+  });
+
+  if (paciente && paciente.nombre) {
+    const nombre = paciente.nombre.trim();
+    const datos = { nombre };
+    await guardarEstadoConversacion(telefono, 'esperando_fecha', datos);
+    await recordatorios.enviarMensaje(
+      telefono,
+      `📅 *Agendar Nueva Cita*\n\nHola *${nombre}*, gusto en saludarte nuevamente. 😊\n\n📅 ¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato DD/MM/YYYY (ej: 17/06/2026)`
+    );
+  } else {
+    // Si no está registrado, pedir su nombre completo
+    await guardarEstadoConversacion(telefono, 'esperando_nombre');
+    await recordatorios.enviarMensaje(
+      telefono,
+      `📅 *Agendar Nueva Cita*\n\nVamos a agendar tu cita. Primero, ¿cual es tu nombre completo?\n\nEscribe tu nombre para continuar.`
+    );
+  }
 }
 
 async function procesarNombre(telefono, nombre, estado) {
@@ -685,6 +727,16 @@ async function procesarFecha(telefono, fecha, estado) {
     return;
   }
   const [, dia, mes, anio] = fecha.match(regex);
+  
+  // Validar que la fecha no sea en el pasado
+  const dateObj = new Date(anio, mes - 1, dia);
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
+  if (dateObj < hoy) {
+    await recordatorios.enviarMensaje(telefono, '❌ La fecha no puede ser en el pasado. Escribe una fecha de hoy en adelante (ej: 17/06/2026).');
+    return;
+  }
+
   const fechaISO = `${anio}-${mes}-${dia}`;
   const slots = await recordatorios.obtenerHorariosDisponibles(fechaISO);
   if (slots.length === 0) {
@@ -775,17 +827,18 @@ async function iniciarCancelacion(telefono) {
   const hoyStr = getLocalDateString();
   const citas = await dbAll(
     `SELECT c.* FROM citas c JOIN pacientes p ON c.paciente_id = p.id
-     WHERE p.telefono = ? AND c.fecha >= ? AND c.estado = 'confirmada'
+     WHERE p.telefono = ? AND c.fecha >= ? AND c.estado IN ('pendiente', 'confirmada')
      ORDER BY c.fecha, c.hora`, [telefono, hoyStr]
   );
   if (citas.length === 0) {
-    await recordatorios.enviarMensaje(telefono, '📋 No tienes citas confirmadas para cancelar.');
+    await recordatorios.enviarMensaje(telefono, '📋 No tienes citas programadas para cancelar.');
     return;
   }
   await guardarEstadoConversacion(telefono, 'cancelando_cita', { citas: citas.map(c => c.id) });
-  let msg = '❌ *Cancelar Cita*\n\nTus citas confirmadas:\n\n';
+  let msg = '❌ *Cancelar Cita*\n\nTus citas programadas:\n\n';
   citas.forEach((cita, i) => {
-    msg += `${i + 1}. 📅 ${cita.fecha} - ⏰ ${cita.hora}\n   📝 ${cita.motivo}\n\n`;
+    const estadoStr = cita.estado === 'confirmada' ? ' (Confirmada)' : ' (Pendiente de confirmación)';
+    msg += `${i + 1}. 📅 ${cita.fecha} - ⏰ ${cita.hora.substring(0, 5)}${estadoStr}\n   📝 ${cita.motivo || 'Consulta general'}\n\n`;
   });
   msg += 'Responde el *numero* de la cita que deseas cancelar.';
   await recordatorios.enviarMensaje(telefono, msg);
@@ -924,12 +977,12 @@ async function procesarMensaje(telefono, mensaje) {
     if (resultado.processed) return;
   }
 
-  if (mensajeLower.includes('cita') || mensajeLower.includes('agendar')) {
-    return iniciarAgendamiento(telefono);
-  } else if (mensajeLower.includes('mis citas') || mensajeLower.includes('consultar')) {
+  if (mensajeLower.includes('mis citas') || mensajeLower.includes('consultar')) {
     return consultarCitas(telefono);
   } else if (mensajeLower.includes('cancelar')) {
     return iniciarCancelacion(telefono);
+  } else if (mensajeLower.includes('cita') || mensajeLower.includes('agendar')) {
+    return iniciarAgendamiento(telefono);
   } else if (mensajeLower.includes('ayuda') || mensajeLower.includes('help')) {
     return mostrarAyuda(telefono);
   } else {
