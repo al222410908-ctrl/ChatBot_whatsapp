@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics — Citas Médicas</title>
+    <meta name="description" content="Estadísticas detalladas de citas, calificaciones y pacientes del consultorio">
+    <!-- Bootstrap 5 & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Estilos compartidos -->
+        <link rel="stylesheet" href="/css/app.css">
+    <script>
+        (function() {
+            const t = localStorage.getItem('theme');
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+            const c = localStorage.getItem('color-theme') || 'clinico';
+            document.documentElement.setAttribute('data-color-theme', c);
+        })();
+    </script>
+    <style>
+        /* ── Stat Cards de Analytics ──────────────────────────── */
+        .analytics-stat-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 22px;
+            transition: border-color 0.2s, transform 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .analytics-stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--accent, var(--color-primary));
+        }
+        .analytics-stat-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+        .analytics-stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-main);
+            line-height: 1;
+        }
+        .analytics-stat-label {
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            margin-top: 5px;
+        }
+        .analytics-stat-icon {
+            width: 42px; height: 42px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+
+        /* ── Chart Cards ──────────────────────────────────────── */
+        .chart-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            transition: border-color 0.2s;
+        }
+        .chart-card:hover { border-color: var(--border-hover); }
+        .chart-title { font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; }
+        .chart-sub   { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 18px; }
+        .chart-wrap  { position: relative; height: 240px; }
+        .chart-wrap.tall { height: 280px; }
+
+        /* ── Rating ─────────────────────────────────────────── */
+        .star-display { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+        .star-big { font-size: 42px; font-weight: 800; color: var(--text-main); }
+        .stars { color: #f59e0b; font-size: 18px; }
+
+        /* ── Patient rows ─────────────────────────────────── */
+        .patient-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .patient-row:last-child { border-bottom: none; }
+        .patient-avatar {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; font-size: 12px; flex-shrink: 0;
+        }
+        .patient-name { font-weight: 600; font-size: 0.88rem; color: var(--text-main); }
+        .patient-tel  { font-size: 0.75rem; color: var(--text-muted); }
+        .patient-badge {
+            margin-left: auto;
+            background: rgba(37, 99, 235, 0.06);
+            color: var(--color-primary);
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        [data-theme="dark"] .patient-badge {
+            background: rgba(37, 99, 235, 0.15);
+        }
+
+        /* ── Loading ─────────────────────────────────────── */
+        .loading-spinner { text-align: center; padding: 60px; color: var(--text-muted); }
+        .loading-spinner i { font-size: 32px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    
+
+    <div class="container-fluid">
+        <div class="row flex-nowrap">
+            <!-- Sidebar Navigation -->
+            <div class="col-md-2 sidebar p-0 d-flex flex-column d-none d-md-flex">
+                <div class="p-4 brand-title d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-hospital fs-4" style="color:#818cf8"></i>
+                    <span class="fs-5">Citas Médicas</span>
+                </div>
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="/dashboard"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+                    <a class="nav-link" href="/citas"><i class="bi bi-calendar3"></i> Citas</a>
+                    <a class="nav-link" href="/pacientes"><i class="bi bi-people-fill"></i> Pacientes</a>
+                    <a class="nav-link" href="/mensajes"><i class="bi bi-chat-left-dots-fill"></i> Mensajes</a>
+                    <a class="nav-link" href="/chat"><i class="bi bi-chat-dots-fill"></i> Chat en Vivo <span class="badge-dot ms-auto" id="unread-dot" style="display:none"></span></a>
+                    <a class="nav-link active" href="/analytics"><i class="bi bi-bar-chart-line-fill"></i> Analytics</a>
+                    <a class="nav-link" href="/configuracion"><i class="bi bi-gear-fill"></i> Configuración</a>
+                </nav>
+
+                <!-- WhatsApp Status Widget -->
+                <div class="wa-status-widget mx-2 mt-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="wa-dot off" id="ws-status-icon"></span>
+                        <span class="fw-semibold small text-main">WhatsApp Bot</span>
+                    </div>
+                    <div id="ws-status-text" class="small text-muted">Consultando...</div>
+                    <div id="ws-qr-container" class="mt-2 text-center d-none">
+                        <img id="ws-qr-img" src="" alt="Escanee QR" class="img-fluid rounded" style="max-height:120px">
+                        <div class="small mt-1 text-warning">📱 Escanee para conectar</div>
+                    </div>
+                    <button onclick="reconectarWA()" class="btn btn-sm w-100 mt-2">
+                        <i class="bi bi-arrow-repeat me-1"></i>Reconectar
+                    </button>
+                </div>
+
+                <div class="px-3 py-2 mt-auto mb-2">
+                    <button class="btn-sidebar-action mb-2 animate-hover" onclick="toggleDark()" id="dark-toggle-btn">
+                        <i class="bi bi-moon-fill" id="dark-icon"></i> Modo Oscuro
+                    </button>
+                    <a href="/logout" class="btn-sidebar-action btn-sidebar-danger animate-hover">
+                        <i class="bi bi-box-arrow-left"></i> Cerrar Sesión
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 main-content">
+
+                <div class="page-header">
+                    <div>
+                        <h2>Analytics del Consultorio</h2>
+                        <p>Estadísticas detalladas de citas, calificaciones y pacientes</p>
+                    </div>
+                    <span id="last-updated" class="badge bg-secondary" style="font-size:11px;font-weight:500;padding:6px 12px;border-radius:6px;"></span>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading" class="loading-spinner">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    <p class="mt-3">Cargando estadísticas...</p>
+                </div>
+
+                <div id="content" style="display:none">
+
+                    <!-- Stat Cards Grid -->
+                    <div class="row g-3 mb-4" id="stat-grid"></div>
+
+                    <!-- Charts Row 1 -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-lg-8">
+                            <div class="chart-card">
+                                <div class="chart-title">Citas por Mes</div>
+                                <div class="chart-sub">Confirmadas vs Canceladas — Últimos 12 meses</div>
+                                <div class="chart-wrap tall"><canvas id="citasMesChart"></canvas></div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="chart-card h-100">
+                                <div class="chart-title">⭐ Calificación Promedio</div>
+                                <div class="chart-sub">Satisfacción de pacientes</div>
+                                <div class="star-display">
+                                    <div class="star-big" id="rating-num">—</div>
+                                    <div>
+                                        <div class="stars" id="rating-stars">☆☆☆☆☆</div>
+                                        <div style="font-size:11px;color:var(--text-muted)" id="rating-count"></div>
+                                    </div>
+                                </div>
+                                <div class="chart-wrap"><canvas id="ratingChart"></canvas></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 2 -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-lg-6">
+                            <div class="chart-card">
+                                <div class="chart-title">Citas por Día de la Semana</div>
+                                <div class="chart-sub">Distribución de demanda semanal</div>
+                                <div class="chart-wrap"><canvas id="diaChart"></canvas></div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="chart-card">
+                                <div class="chart-title">Distribución de Calificaciones</div>
+                                <div class="chart-sub">Desglose de encuestas respondidas</div>
+                                <div class="chart-wrap"><canvas id="distribChart"></canvas></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Pacientes -->
+                    <div class="chart-card mb-4">
+                        <div class="chart-title mb-1">👥 Pacientes Más Frecuentes</div>
+                        <div class="chart-sub">Top 10 por número de citas</div>
+                        <div id="top-patients"></div>
+                    </div>
+
+                    <!-- Centro de Reseñas y Feedback (Feedback Center) -->
+                    <div class="chart-card mb-4">
+                        <div class="chart-title mb-1">⭐ Centro de Reseñas y Opiniones (Feedback Center)</div>
+                        <div class="chart-sub">Desglose de calificaciones de pacientes y atención prioritaria para calificaciones bajas</div>
+                        
+                        <div class="row mt-4">
+                            <!-- Columna Izquierda: Amazon style Rating distribution bars -->
+                            <div class="col-lg-5 mb-4 mb-lg-0 border-end pe-lg-4">
+                                <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-fill text-warning me-1"></i> Distribución de Estrellas</h6>
+                                <div id="amazon-distribution-bars">
+                                    <!-- Dynamic bars go here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Columna Derecha: List of Rated Appointments / Reviews -->
+                            <div class="col-lg-7 ps-lg-4">
+                                <h6 class="fw-bold mb-3"><i class="bi bi-chat-square-text-fill text-primary me-1"></i> Reseñas Recientes</h6>
+                                <div id="rated-appointments-list" style="max-height: 400px; overflow-y: auto; padding-right: 8px;">
+                                    <!-- Dynamic review list goes here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // ── Dark Mode ─────────────────────────────────────────────
+        function toggleDark() {
+            const html = document.documentElement;
+            const isDark = html.getAttribute('data-theme') === 'dark';
+            const nextTheme = isDark ? '' : 'dark';
+            html.setAttribute('data-theme', nextTheme);
+            html.setAttribute('data-bs-theme', nextTheme === 'dark' ? 'dark' : 'light');
+            const btn = document.getElementById('dark-toggle-btn');
+            if (btn) {
+                btn.innerHTML = isDark
+                    ? '<i class="bi bi-moon-fill" id="dark-icon"></i> Modo Oscuro'
+                    : '<i class="bi bi-sun-fill" id="dark-icon"></i> Modo Claro';
+            }
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('theme') === 'dark') {
+                const btn = document.getElementById('dark-toggle-btn');
+                if (btn) btn.innerHTML = '<i class="bi bi-sun-fill" id="dark-icon"></i> Modo Claro';
+            }
+            if (window.lucide) window.lucide.createIcons();
+        });
+
+        // ── SSE ───────────────────────────────────────────────────
+        async function loadUnreadCount() {
+            try {
+                const res = await fetch('/api/chat/no-leidos');
+                const data = await res.json();
+                const dot = document.getElementById('unread-dot');
+                if (dot) dot.style.display = data.count > 0 ? 'inline-block' : 'none';
+            } catch (e) {}
+        }
+        loadUnreadCount();
+
+        const sseConn = new EventSource('/api/updates/live');
+        sseConn.addEventListener('wa_status', e => {
+            const d = JSON.parse(e.data);
+            const dot = document.getElementById('ws-status-icon');
+            const text = document.getElementById('ws-status-text');
+            const qrContainer = document.getElementById('ws-qr-container');
+            const qrImg = document.getElementById('ws-qr-img');
+            if (d.status === 'conectado') {
+                if (dot) dot.className = 'wa-dot on';
+                if (text) text.innerText = '✅ Conectado y listo';
+                if (qrContainer) qrContainer.classList.add('d-none');
+            } else {
+                if (dot) dot.className = 'wa-dot off';
+                if (text) text.innerText = `⚠️ ${d.status === 'qr_listo' ? 'Escanea el QR' : 'Desconectado'}`;
+                if (d.qr || d.qrCode) {
+                    if (qrImg) qrImg.src = d.qr || d.qrCode;
+                    if (qrContainer) qrContainer.classList.remove('d-none');
+                }
+            }
+        });
+        sseConn.addEventListener('mensaje', e => {
+            const d = JSON.parse(e.data);
+            if (d.remitente === 'paciente') {
+                const dot = document.getElementById('unread-dot');
+                if (dot) dot.style.display = 'inline-block';
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (sseConn) sseConn.close();
+        });
+
+        async function reconectarWA() {
+            try { await fetch('/api/whatsapp/reconectar', { method: 'POST' }); } catch (e) {}
+        }
+
+        // ── Analytics ─────────────────────────────────────────────
+        const COLORS = {
+            indigo: '#4f46e5', violet: '#7c3aed', emerald: '#10b981',
+            rose: '#f43f5e', amber: '#f59e0b', sky: '#0ea5e9',
+        };
+        const CHART_DEFAULTS = { borderRadius: 6, borderSkipped: false };
+
+        async function loadAnalytics() {
+            const r = await fetch('/api/analytics');
+            const data = await r.json();
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('last-updated').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-MX');
+
+            renderStats(data.resumen);
+            renderCitasMes(data.citasPorMes);
+            renderRating(data.resumen, data.ratingPorMes, data.distribCalificaciones);
+            renderDias(data.citasPorDia);
+            renderDistrib(data.distribCalificaciones);
+            renderTopPacientes(data.topPacientes);
+            renderFeedbackCenter(data.distribCalificaciones, data.citasValoradas);
+        }
+
+        function renderStats(r) {
+            if (!r) return;
+            const tasa = r.total_citas > 0 ? Math.round(r.confirmadas / r.total_citas * 100) : 0;
+            const cards = [
+                { label: 'Total Citas', value: r.total_citas || 0, icon: 'bi-calendar-check', color: COLORS.indigo, bg: 'rgba(79,70,229,0.06)', accent: COLORS.indigo },
+                { label: 'Confirmadas', value: r.confirmadas || 0, icon: 'bi-check-circle-fill', color: COLORS.emerald, bg: 'rgba(16,185,129,0.06)', accent: COLORS.emerald },
+                { label: 'Canceladas',  value: r.canceladas  || 0, icon: 'bi-x-circle-fill', color: '#f43f5e', bg: 'rgba(244,63,94,0.06)', accent: '#f43f5e' },
+                { label: 'Pacientes Únicos', value: r.pacientes_atendidos || 0, icon: 'bi-people-fill', color: COLORS.sky, bg: 'rgba(14,165,233,0.06)', accent: COLORS.sky },
+                { label: 'Rating Promedio', value: r.rating_promedio ? parseFloat(r.rating_promedio).toFixed(1) + ' ⭐' : '—', icon: 'bi-star-fill', color: COLORS.amber, bg: 'rgba(245,158,11,0.06)', accent: COLORS.amber },
+                { label: 'Tasa Confirmación', value: tasa + '%', icon: 'bi-graph-up-arrow', color: COLORS.violet, bg: 'rgba(124,58,237,0.06)', accent: COLORS.violet },
+            ];
+            document.getElementById('stat-grid').innerHTML = cards.map(c => `
+                <div class="col-xl-2 col-md-4 col-sm-6">
+                    <div class="analytics-stat-card" style="--accent:${c.accent}">
+                        <div class="analytics-stat-icon" style="background:${c.bg};color:${c.color}">
+                            <i class="bi ${c.icon}"></i>
+                        </div>
+                        <div class="analytics-stat-value">${c.value}</div>
+                        <div class="analytics-stat-label">${c.label}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderCitasMes(data) {
+            const labels = data.map(d => {
+                const [y, m] = d.mes.split('-');
+                return new Date(y, m-1).toLocaleDateString('es-MX', { month: 'short', year: '2-digit' });
+            });
+            new Chart(document.getElementById('citasMesChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Confirmadas', data: data.map(d => d.confirmadas), backgroundColor: COLORS.emerald + 'cc', ...CHART_DEFAULTS },
+                        { label: 'Canceladas',  data: data.map(d => d.canceladas),  backgroundColor: '#f43f5e' + 'cc', ...CHART_DEFAULTS },
+                    ],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: { x: { stacked: false, grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } }
+                },
+            });
+        }
+
+        function renderRating(resumen, porMes, distrib) {
+            const rating = parseFloat(resumen?.rating_promedio) || 0;
+            document.getElementById('rating-num').textContent = rating ? rating.toFixed(1) : '—';
+            document.getElementById('rating-stars').textContent = rating
+                ? '⭐'.repeat(Math.round(rating)) + '☆'.repeat(5 - Math.round(rating))
+                : '☆☆☆☆☆';
+            const totalEncuestas = distrib.reduce((a, b) => a + b.cantidad, 0);
+            document.getElementById('rating-count').textContent = `${totalEncuestas} encuestas respondidas`;
+
+            new Chart(document.getElementById('ratingChart'), {
+                type: 'line',
+                data: {
+                    labels: porMes.map(d => { const [y,m]=d.mes.split('-'); return new Date(y,m-1).toLocaleDateString('es-MX',{month:'short'}); }),
+                    datasets: [{ label: 'Calificación', data: porMes.map(d => d.promedio), borderColor: COLORS.amber, backgroundColor: COLORS.amber + '22', fill: true, tension: 0.4, pointBackgroundColor: COLORS.amber, pointRadius: 4 }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { min: 0, max: 5, ticks: { precision: 1 } }, x: { grid: { display: false } } }
+                },
+            });
+        }
+
+        function renderDias(data) {
+            new Chart(document.getElementById('diaChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.dia),
+                    datasets: [{ label: 'Citas', data: data.map(d => d.total),
+                        backgroundColor: [COLORS.indigo + 'cc', COLORS.violet + 'cc', COLORS.emerald + 'cc', COLORS.sky + 'cc', COLORS.amber + 'cc', '#f43f5e' + 'cc', '#64748b' + 'cc'],
+                        ...CHART_DEFAULTS }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } }
+                },
+            });
+        }
+
+        function renderDistrib(data) {
+            const emojis = ['', '😞', '😐', '🙂', '😊', '🤩'];
+            new Chart(document.getElementById('distribChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => `${emojis[d.calificacion]} ${d.calificacion} estrella${d.calificacion > 1 ? 's' : ''}`),
+                    datasets: [{ data: data.map(d => d.cantidad),
+                        backgroundColor: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#4f46e5'],
+                        borderWidth: 2, borderColor: 'var(--surface-color)' }],
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } },
+            });
+        }
+
+        function renderTopPacientes(data) {
+            if (!data || data.length === 0) {
+                document.getElementById('top-patients').innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:20px 0">No hay datos suficientes aún.</p>';
+                return;
+            }
+            document.getElementById('top-patients').innerHTML = data.map(p => `
+                <div class="patient-row">
+                    <div class="patient-avatar">${p.nombre.charAt(0).toUpperCase()}</div>
+                    <div>
+                        <div class="patient-name">${p.nombre}</div>
+                        <div class="patient-tel">${p.telefono}</div>
+                    </div>
+                    ${p.rating ? `<div style="color:var(--text-muted);font-size:12px">⭐ ${parseFloat(p.rating).toFixed(1)}</div>` : ''}
+                    <span class="patient-badge">${p.total_citas} cita${p.total_citas != 1 ? 's' : ''}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderFeedbackCenter(distrib, citasValoradas) {
+            // 1. Render Amazon-style progress bars
+            const total = distrib.reduce((a, b) => a + b.cantidad, 0);
+            const stars = [5, 4, 3, 2, 1];
+            let barsHTML = '';
+            
+            stars.forEach(s => {
+                const found = distrib.find(d => d.calificacion === s);
+                const count = found ? found.cantidad : 0;
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                
+                barsHTML += `
+                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 0.85rem;">
+                        <span style="width: 75px; font-weight: 550;" class="text-nowrap">${s} estrella${s > 1 ? 's' : ''}</span>
+                        <div class="progress flex-grow-1" style="height: 10px; border-radius: 5px; background-color: var(--border-color); overflow: hidden;">
+                            <div class="progress-bar" style="width: ${pct}%; background-color: #ffb703; border-radius: 5px; transition: width 0.5s ease;"></div>
+                        </div>
+                        <span style="width: 40px; font-weight: 550;" class="text-end text-muted">${pct}%</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); width: 25px;" class="text-end">(${count})</span>
+                    </div>
+                `;
+            });
+            document.getElementById('amazon-distribution-bars').innerHTML = barsHTML;
+
+            // 2. Render reviews list
+            const container = document.getElementById('rated-appointments-list');
+            if (!citasValoradas || citasValoradas.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center py-4" style="font-size: 13px;"><i class="bi bi-chat-square-x me-1"></i> Aún no se han recibido opiniones de pacientes.</p>';
+                return;
+            }
+
+            container.innerHTML = citasValoradas.map(c => {
+                const rating = c.calificacion;
+                const starStr = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+                const colorClass = rating >= 4 ? 'text-success' : rating === 3 ? 'text-warning' : 'text-danger';
+                
+                // Si califica con 1 o 2, agregamos el botón de atención inmediata con animación de pulso
+                let actionBtn = '';
+                if (rating <= 2) {
+                    actionBtn = `
+                        <a href="/chat?phone=${c.paciente_telefono}" class="btn btn-danger btn-sm text-white ms-auto d-flex align-items-center gap-1 py-1 px-2 animate-pulse-btn" style="font-size:0.75rem; font-weight:600; border: none; border-radius: 4px;">
+                            <i class="bi bi-chat-fill"></i> Atención Inmediata
+                        </a>
+                    `;
+                } else {
+                    actionBtn = `
+                        <a href="/chat?phone=${c.paciente_telefono}" class="btn btn-outline-secondary btn-sm ms-auto py-1 px-2" style="font-size:0.75rem; border-radius: 4px;">
+                            <i class="bi bi-chat-text"></i> Chatear
+                        </a>
+                    `;
+                }
+
+                // Formatear fecha
+                const [yyyy, mm, dd] = c.fecha.split('-');
+                const fechaFormateada = `${dd}/${mm}/${yyyy}`;
+
+                // Mostrar notas de la consulta como comentario
+                const comentario = c.notes || c.notas ? (c.notes || c.notas).trim() : '<span class="text-muted italic" style="font-style: italic;">Sin comentarios adicionales de consulta.</span>';
+
+                return `
+                    <div class="patient-row flex-wrap align-items-center py-3" style="border-bottom: 1px solid var(--border-color);">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0" style="max-width: 70%;">
+                            <div class="patient-avatar" style="background: ${rating <= 2 ? 'linear-gradient(135deg, #ef4444, #f87171)' : 'linear-gradient(135deg, #4f46e5, #7c3aed)'}">
+                                ${c.paciente_nombre.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="patient-name text-truncate" style="font-size:0.88rem; font-weight: 600;">${c.paciente_nombre}</div>
+                                <div class="patient-tel text-muted" style="font-size:0.75rem;">+${c.paciente_telefono} • Cita: ${fechaFormateada} ${c.hora.substring(0, 5)}</div>
+                                <div class="mt-1 text-main text-wrap" style="font-size: 0.82rem; line-height: 1.4;">
+                                    ${comentario}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-2 ms-auto">
+                            <span class="${colorClass}" style="font-size: 0.95rem; font-weight: 700; letter-spacing: 1px;">
+                                ${starStr}
+                            </span>
+                            ${actionBtn}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        loadAnalytics();
+    </script>
+</body>
+</html>

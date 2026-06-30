@@ -1,0 +1,685 @@
+/* ============================================================
+   app.css — Estilos compartidos del Sistema de Citas Médicas
+   Soporte premium para Modo Claro y Modo Oscuro
+   ============================================================ */
+
+/* ── Google Fonts: Inter ────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Variables de diseño (Diseño del Sistema) ────────────────── */
+:root {
+  --font-main:        'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --border-radius:    8px; /* Máximo 8px según requerimiento */
+
+  /* Colores - Modo Claro */
+  --background-color: #f8fafc;
+  --surface-color:    #ffffff;
+  --text-main:        #0f172a;
+  --text-muted:       #64748b;
+  --border-color:     #e2e8f0;
+  --border-hover:     #cbd5e1;
+
+  /* Temas de Estado */
+  --color-primary:    #2563eb; /* Azul Rey Premium */
+  --color-primary-soft: rgba(37, 99, 235, 0.08);
+  --color-primary-hover-soft: rgba(37, 99, 235, 0.05);
+  --color-success:    #10b981; /* Verde esmeralda */
+  --color-danger:     #ef4444; /* Rojo */
+  --color-warning:    #f59e0b; /* Ámbar */
+  --color-info:       #06b6d4; /* Cian */
+  --color-reagenda:   #0d9488; /* Teal */
+
+  /* Sombras sutiles - Modo Claro */
+  --shadow-sm:        0 1px 3px rgba(15, 23, 42, 0.03), 0 1px 2px rgba(15, 23, 42, 0.02);
+  --shadow-md:        0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.03);
+
+  /* Mapeo de Variables Bootstrap 5 - Modo Claro */
+  --bs-body-font-family: var(--font-main);
+  --bs-body-color:       var(--text-main);
+  --bs-body-bg:          var(--background-color);
+  --bs-secondary-color:  var(--text-muted);
+  --bs-border-color:     var(--border-color);
+  --bs-heading-color:    var(--text-main);
+  --bs-card-bg:          var(--surface-color);
+  --bs-card-color:       var(--text-main);
+  --bs-card-border-color: var(--border-color);
+  --bs-tertiary-bg:      var(--background-color);
+  --bs-body-bg-rgb:      248, 250, 252;
+}
+
+[data-theme="dark"] {
+  /* Colores - Modo Oscuro */
+  --background-color: #0b0f19; /* Gris azulado muy profundo */
+  --surface-color:    #151d30; /* Tarjetas ligeramente más claras */
+  --text-main:        #f8fafc; /* Texto principal */
+  --text-muted:       #94a3b8; /* Texto secundario */
+  --border-color:     rgba(255, 255, 255, 0.06);
+  --border-hover:     rgba(255, 255, 255, 0.12);
+
+  /* Sombras desactivadas en modo oscuro */
+  --shadow-sm:        none;
+  --shadow-md:        none;
+
+  /* Mapeo de Variables Bootstrap 5 - Modo Oscuro */
+  --bs-body-color:       var(--text-main);
+  --bs-body-bg:          var(--background-color);
+  --bs-secondary-color:  var(--text-muted);
+  --bs-border-color:     var(--border-color);
+  --bs-heading-color:    var(--text-main);
+  --bs-card-bg:          var(--surface-color);
+  --bs-card-color:       var(--text-main);
+  --bs-card-border-color: var(--border-color);
+  --bs-tertiary-bg:      var(--surface-color);
+  --bs-body-bg-rgb:      11, 15, 25;
+}
+
+/* ── Reset y base ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--background-color);
+  color: var(--text-main);
+  overflow-x: hidden;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-main);
+}
+
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+/* Forzar colores de texto de Bootstrap en tarjetas y tablas en modo oscuro */
+[data-theme="dark"] .table {
+  --bs-table-color: var(--text-main);
+  --bs-table-bg: var(--surface-color);
+  --bs-table-border-color: var(--border-color);
+  --bs-table-striped-color: var(--text-main);
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.02);
+  --bs-table-active-color: var(--text-main);
+  --bs-table-active-bg: rgba(255, 255, 255, 0.04);
+  --bs-table-hover-color: var(--text-main);
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.02);
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .table td {
+  color: var(--text-main) !important;
+}
+
+[data-theme="dark"] .table th {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .card {
+  color: var(--text-main);
+}
+
+/* ── Sidebar Lateral ────────────────────────────────────────── */
+.sidebar {
+  background-color: var(--surface-color);
+  border-right: 1px solid var(--border-color);
+  min-height: 100vh;
+  color: var(--text-main);
+  box-shadow: none;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+[data-theme="dark"] .sidebar {
+  background-color: var(--background-color); /* Se mimetiza con el fondo oscuro profundo */
+}
+
+.sidebar .brand-title {
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.2px;
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar .nav-link {
+  color: var(--text-muted);
+  padding: 10px 18px;
+  margin: 3px 12px;
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  position: relative;
+}
+
+.sidebar .nav-link i {
+  font-size: 1.05rem;
+}
+
+.sidebar .nav-link:hover {
+  background-color: rgba(37, 99, 235, 0.05);
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .sidebar .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+  color: #ffffff;
+}
+
+.sidebar .nav-link.active {
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* Indicador de línea vertical fina para elemento activo */
+.sidebar .nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background-color: var(--color-primary);
+  border-radius: 0 4px 4px 0;
+}
+
+[data-theme="dark"] .sidebar .nav-link.active {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+/* ── Widget de estado WhatsApp (sidebar) ─────────────────────── */
+.wa-status-widget {
+  background-color: rgba(100, 116, 139, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 12px;
+  margin: 12px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+[data-theme="dark"] .wa-status-widget {
+  background-color: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.wa-status-widget .wa-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.wa-dot.on  { background: var(--color-success); box-shadow: 0 0 6px var(--color-success); animation: pulse-green 2s infinite; }
+.wa-dot.off { background: var(--color-danger); }
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* Botón de reconectar minimalista en el widget */
+.wa-status-widget .btn {
+  background-color: transparent !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-main) !important;
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  margin-top: 8px;
+  border-radius: 6px;
+  width: 100%;
+}
+
+.wa-status-widget .btn:hover {
+  background-color: rgba(99, 102, 241, 0.05) !important;
+  border-color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .wa-status-widget .btn:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Botones de acción del sidebar inferior */
+.btn-sidebar-action {
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  padding: 8px 12px;
+  border-radius: 6px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-sidebar-action:hover {
+  background-color: rgba(99, 102, 241, 0.05);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+[data-theme="dark"] .btn-sidebar-action:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.btn-sidebar-danger {
+  background-color: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+}
+
+.btn-sidebar-danger:hover {
+  background-color: rgba(239, 68, 68, 0.05);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+[data-theme="dark"] .btn-sidebar-danger:hover {
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+/* ── Banner de advertencia WhatsApp desconectado ─────────────── */
+.wa-disconnected-banner {
+  background-color: rgba(245, 158, 11, 0.05);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--border-radius);
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.88rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Main Content ───────────────────────────────────────────── */
+.main-content {
+  padding: 30px 32px;
+}
+
+/* ── Tarjetas Estilo Bento ───────────────────────────────────── */
+.card {
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+
+.card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.card-header {
+  background-color: transparent;
+  border-bottom: none;
+  padding: 20px 20px 8px 20px;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--text-main);
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* ── Tarjetas de Métricas (Contadores Rediseñados) ────────────── */
+.stat-card {
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  border-radius: var(--border-radius);
+}
+
+.stat-card .card-body {
+  padding: 16px;
+}
+
+.stat-card h3 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.stat-icon-wrapper {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+/* Variaciones del Icono Superior Derecho */
+.bg-primary-soft   { background-color: rgba(37, 99, 235, 0.06); }
+.bg-success-soft   { background-color: rgba(16, 185, 129, 0.06); }
+.bg-danger-soft    { background-color: rgba(239, 68, 68, 0.06); }
+.bg-warning-soft   { background-color: rgba(245, 158, 11, 0.06); }
+.bg-info-soft      { background-color: rgba(6, 182, 212, 0.06); }
+.bg-secondary-soft { background-color: rgba(100, 116, 139, 0.06); }
+
+[data-theme="dark"] .bg-primary-soft   { background-color: rgba(37, 99, 235, 0.12); }
+[data-theme="dark"] .bg-success-soft   { background-color: rgba(16, 185, 129, 0.12); }
+[data-theme="dark"] .bg-danger-soft    { background-color: rgba(239, 68, 68, 0.12); }
+[data-theme="dark"] .bg-warning-soft   { background-color: rgba(245, 158, 11, 0.12); }
+[data-theme="dark"] .bg-info-soft      { background-color: rgba(6, 182, 212, 0.12); }
+[data-theme="dark"] .bg-secondary-soft { background-color: rgba(100, 116, 139, 0.12); }
+
+/* ── Tablas ─────────────────────────────────────────────────── */
+.table {
+  vertical-align: middle;
+  margin-bottom: 0;
+  background-color: transparent;
+  color: var(--text-main);
+}
+
+.table th {
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px 16px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table td {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(100, 116, 139, 0.02) !important;
+}
+
+[data-theme="dark"] .table-hover tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* ── Botones de Acciones Rápidas (Rediseño) ──────────────────── */
+.btn {
+  border-radius: var(--border-radius);
+  padding: 8px 16px;
+  font-weight: 550;
+  font-size: 0.85rem;
+  transition: all 0.2s ease-in-out;
+  box-shadow: none !important;
+}
+
+/* Botón Principal Destacado (Azul Rey Premium) */
+.btn-primary {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+/* Botones Secundarios Tipo Outline (Sin color inicial, solo hover) */
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-info,
+.btn-outline-warning,
+.btn-outline-secondary {
+  background-color: var(--surface-color);
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+/* Modo Claro: Transiciones suaves al hacer hover */
+.btn-outline-primary:hover { background-color: rgba(37, 99, 235, 0.05); border-color: var(--color-primary); color: var(--color-primary); }
+.btn-outline-success:hover { background-color: rgba(16, 185, 129, 0.05); border-color: var(--color-success); color: var(--color-success); }
+.btn-outline-info:hover { background-color: rgba(6, 182, 212, 0.05); border-color: var(--color-info); color: var(--color-info); }
+.btn-outline-warning:hover { background-color: rgba(245, 158, 11, 0.05); border-color: var(--color-warning); color: var(--color-warning); }
+.btn-outline-secondary:hover { background-color: rgba(100, 116, 139, 0.05); border-color: var(--text-muted); color: var(--text-main); }
+
+/* Modo Oscuro: Sobrescribir botones a transparente con hover sutil */
+[data-theme="dark"] .btn-outline-primary,
+[data-theme="dark"] .btn-outline-success,
+[data-theme="dark"] .btn-outline-info,
+[data-theme="dark"] .btn-outline-warning,
+[data-theme="dark"] .btn-outline-secondary {
+  background-color: transparent;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .btn-outline-primary:hover { background-color: rgba(37, 99, 235, 0.08); border-color: var(--color-primary); color: #ffffff; }
+[data-theme="dark"] .btn-outline-success:hover { background-color: rgba(16, 185, 129, 0.08); border-color: var(--color-success); color: #ffffff; }
+[data-theme="dark"] .btn-outline-info:hover { background-color: rgba(6, 182, 212, 0.08); border-color: var(--color-info); color: #ffffff; }
+[data-theme="dark"] .btn-outline-warning:hover { background-color: rgba(245, 158, 11, 0.08); border-color: var(--color-warning); color: #ffffff; }
+[data-theme="dark"] .btn-outline-secondary:hover { background-color: rgba(255, 255, 255, 0.05); border-color: var(--text-muted); color: #ffffff; }
+
+/* ── Badges de Estado ────────────────────────────────────────── */
+.badge {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.2px;
+}
+
+/* ── Guía del Chatbot ────────────────────────────────────────── */
+.guide-step {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.guide-step-icon {
+  background-color: rgba(37, 99, 235, 0.06);
+  color: var(--color-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+[data-theme="dark"] .guide-step-icon {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.guide-step-content h6 {
+  margin-bottom: 3px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.guide-step-content p {
+  margin-bottom: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Form Controls (Inputs y Selects) ────────────────────────── */
+.form-control, .form-select {
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background-color: var(--surface-color);
+  color: var(--text-main);
+  font-family: var(--font-main);
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background-color: var(--surface-color);
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .input-group-text {
+  background-color: #0f172a;
+  color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus {
+  border-color: var(--color-primary);
+  background-color: #0f172a;
+}
+
+/* ── Cabecera de Página ──────────────────────────────────────── */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.page-header h2 {
+  font-weight: 700;
+  font-size: 1.5rem;
+  margin-bottom: 2px;
+}
+
+.page-header p {
+  color: var(--text-muted);
+  margin-bottom: 0;
+  font-size: 0.88rem;
+}
+
+/* ── Badge de Estado Anti-Spam ───────────────────────────────── */
+.antispam-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(16, 185, 129, 0.05);
+  border: 1px solid var(--color-success);
+  color: var(--color-success);
+  border-radius: 30px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ── Modales ────────────────────────────────────────────────── */
+.modal-content {
+  background-color: var(--surface-color);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header, .modal-footer {
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-content {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .btn-close {
+  filter: invert(1) grayscale(1) brightness(2);
+}
+
+/* ============================================================
+   Temas Personalizados & Alertas de Feedback
+   ============================================================ */
+
+/* 1. Tema Lavanda Relax */
+[data-color-theme="lavanda"] {
+  --color-primary: #8b5cf6; /* Morado Lavanda */
+  --color-primary-soft: rgba(139, 92, 246, 0.08);
+  --color-primary-hover-soft: rgba(139, 92, 246, 0.05);
+}
+[data-theme="dark"][data-color-theme="lavanda"] {
+  --color-primary: #a78bfa;
+  --color-primary-soft: rgba(167, 139, 250, 0.12);
+  --color-primary-hover-soft: rgba(167, 139, 250, 0.08);
+}
+
+/* 2. Tema Bosque Eco */
+[data-color-theme="bosque"] {
+  --color-primary: #059669; /* Verde Bosque */
+  --color-primary-soft: rgba(5, 150, 105, 0.08);
+  --color-primary-hover-soft: rgba(5, 150, 105, 0.05);
+}
+[data-theme="dark"][data-color-theme="bosque"] {
+  --color-primary: #34d399;
+  --color-primary-soft: rgba(52, 211, 153, 0.12);
+  --color-primary-hover-soft: rgba(52, 211, 153, 0.08);
+}
+
+/* 3. Tema Cyberpunk */
+[data-color-theme="cyberpunk"] {
+  --color-primary: #ec4899; /* Rosa Cyberpunk */
+  --color-primary-soft: rgba(236, 72, 153, 0.08);
+  --color-primary-hover-soft: rgba(236, 72, 153, 0.05);
+}
+[data-theme="dark"][data-color-theme="cyberpunk"] {
+  --color-primary: #f472b6;
+  --color-primary-soft: rgba(244, 114, 182, 0.12);
+  --color-primary-hover-soft: rgba(244, 114, 182, 0.08);
+}
+
+/* 4. Tema OLED Dark (Fondo negro absoluto) */
+[data-color-theme="oled"] {
+  --color-primary: #8b5cf6; /* Púrpura */
+  --color-primary-soft: rgba(139, 92, 246, 0.08);
+  --color-primary-hover-soft: rgba(139, 92, 246, 0.05);
+}
+[data-theme="dark"][data-color-theme="oled"] {
+  --background-color: #000000;
+  --surface-color: #090a0f;
+  --border-color: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.1);
+  --color-primary: #c084fc;
+  --color-primary-soft: rgba(192, 132, 252, 0.15);
+  --color-primary-hover-soft: rgba(192, 132, 252, 0.08);
+  --bs-body-bg-rgb: 0, 0, 0;
+}
+
+/* Animación pulsante para el botón de Atención Inmediata */
+.animate-pulse-btn {
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  animation: pulse-danger-animation 1.6s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+@keyframes pulse-danger-animation {
+  to {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+}

@@ -32,10 +32,12 @@ try {
 }
 
 # -- 2. Instalar dependencias si es necesario --
-if (-not (Test-Path "node_modules")) {
+if (-not (Test-Path "backend/node_modules")) {
     Write-Host ""
     Write-Host "  Instalando dependencias (primera vez, puede tardar unos minutos)..." -ForegroundColor Yellow
+    Push-Location backend
     npm install
+    Pop-Location
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
         Write-Host "  [ERROR] Error al instalar dependencias." -ForegroundColor Red
@@ -48,14 +50,14 @@ if (-not (Test-Path "node_modules")) {
 
 # -- 3. Leer PIN del archivo .env.local --
 $pinInfo = "1234 (por defecto)"
-$envPath = Join-Path $scriptDir ".env.local"
+$envPath = Join-Path $scriptDir "backend/.env.local"
 if (Test-Path $envPath) {
     $envContent = Get-Content $envPath -Raw
     if ($envContent -match "DASHBOARD_PIN=(\S+)") {
         $pinInfo = $Matches[1]
     }
 } else {
-    $envPath2 = Join-Path $scriptDir ".env"
+    $envPath2 = Join-Path $scriptDir "backend/.env"
     if (Test-Path $envPath2) {
         $envContent2 = Get-Content $envPath2 -Raw
         if ($envContent2 -match "DASHBOARD_PIN=(\S+)") {
@@ -68,7 +70,7 @@ if (Test-Path $envPath) {
 Write-Host ""
 Write-Host "  Iniciando servidor..." -ForegroundColor Yellow
 
-$serverCmd = "Set-Location '$scriptDir'; `$Host.UI.RawUI.WindowTitle = 'Servidor - Citas Medicas'; Write-Host 'Servidor iniciado en http://localhost:3001' -ForegroundColor Green; Write-Host 'Presiona Ctrl+C para detener.' -ForegroundColor Yellow; node dashboard.js"
+$serverCmd = "Set-Location '$scriptDir/backend'; `$Host.UI.RawUI.WindowTitle = 'Servidor - Citas Medicas'; Write-Host 'Servidor iniciado en http://localhost:3001' -ForegroundColor Green; Write-Host 'Presiona Ctrl+C para detener.' -ForegroundColor Yellow; node dashboard.js"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $serverCmd
 
 Start-Sleep -Seconds 4

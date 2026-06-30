@@ -27,10 +27,12 @@ if %errorlevel% neq 0 (
 for /f "tokens=*" %%v in ('node --version') do echo   [✓] Node.js %%v detectado
 
 :: ── Instalar dependencias si no existen ──────────
-if not exist "node_modules\" (
+if not exist "backend\node_modules\" (
     echo.
     echo   [→] Instalando dependencias (primera vez)...
+    cd backend
     call npm install
+    cd ..
     if %errorlevel% neq 0 (
         echo.
         echo   [✗] Error al instalar dependencias.
@@ -42,8 +44,8 @@ if not exist "node_modules\" (
 
 :: ── Leer PIN del .env.local ──────────────────────
 set PIN=1234
-if exist ".env.local" (
-    for /f "tokens=1,2 delims==" %%a in (.env.local) do (
+if exist "backend\.env.local" (
+    for /f "tokens=1,2 delims==" %%a in (backend\.env.local) do (
         if "%%a"=="DASHBOARD_PIN" set PIN=%%b
     )
 )
@@ -61,7 +63,7 @@ echo   ────────────────────────�
 echo.
 echo   [→] Iniciando servidor...
 
-start "Servidor Citas Médicas" /min cmd /c "cd /d "%~dp0" && node dashboard.js"
+start "Servidor Citas Médicas" /min cmd /c "cd /d "%~dp0backend" && node dashboard.js"
 
 :: ── Esperar a que el servidor arranque ───────────
 timeout /t 5 /nobreak >nul

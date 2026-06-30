@@ -130,8 +130,8 @@ async function build() {
   console.log(`  ${C.white}Ubicación: ${C.cyan}${outputPath}${C.reset}`);
   console.log(`  ${C.white}Tamaño:    ${C.cyan}${sizeMB} MB${C.reset}`);
   console.log('');
-  console.log(`  ${C.dim}IMPORTANTE: El .exe debe estar en la misma carpeta${C.reset}`);
-  console.log(`  ${C.dim}que dashboard.js, views/, public/, node_modules/, etc.${C.reset}`);
+  console.log(`  ${C.dim}IMPORTANTE: El .exe debe estar en la misma carpeta raíz${C.reset}`);
+  console.log(`  ${C.dim}que las carpetas backend/ y frontend/.${C.reset}`);
   console.log(`  ${C.dim}Es un LANZADOR, no un empaquetado completo.${C.reset}`);
   console.log('');
   console.log(`  ${C.yellow}Para usarlo: Haz doble clic en "${outputName}"${C.reset}`);

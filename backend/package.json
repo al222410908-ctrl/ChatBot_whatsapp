@@ -1,0 +1,17 @@
+{
+  "name": "sistema-citas-medicas-backend",
+  "version": "1.0.0",
+  "description": "Backend para el Sistema de Citas Medicas",
+  "main": "dashboard.js",
+  "scripts": {
+    "start": "node dashboard.js"
+  },
+  "dependencies": {
+    "ejs": "^6.0.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "qrcode": "^1.5.4",
+    "sqlite3": "^5.1.7",
+    "whatsapp-web.js": "^1.34.7"
+  }
+}

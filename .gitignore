@@ -74,3 +74,6 @@ uploads/
 docs/plans/
 CLAUDE.md
 _docs/
+
+# Binaries
+*.exe

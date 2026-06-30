@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control - Citas Médicas</title>
+    <meta name="description" content="Panel de control para gestión de citas médicas con confirmación automática vía WhatsApp">
+    <!-- Bootstrap 5 & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- SweetAlert2 & Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Estilos compartidos -->
+        <link rel="stylesheet" href="/css/app.css">
+    <script>
+        (function() {
+            const t = localStorage.getItem('theme');
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+            const c = localStorage.getItem('color-theme') || 'clinico';
+            document.documentElement.setAttribute('data-color-theme', c);
+        })();
+    </script>
+    <style>
+        /* ── Estilos específicos del Dashboard ── */
+        .stat-card {
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+        }
+        .today-citas-card {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #6d28d9 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .today-citas-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(79, 70, 229, 0.2);
+        }
+        .today-citas-card::before {
+            content: '';
+            position: absolute;
+            top: -40px; right: -40px;
+            width: 160px; height: 160px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 50%;
+        }
+        .today-citas-card::after {
+            content: '';
+            position: absolute;
+            bottom: -20px; left: 40px;
+            width: 100px; height: 100px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 50%;
+        }
+        .confirmation-rate {
+            height: 8px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .confirmation-rate-fill {
+            height: 100%;
+            background: #22c55e;
+            border-radius: 8px;
+            transition: width 1s ease-in-out;
+        }
+        .test-msg-result {
+            display: none;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row flex-nowrap">
+            <!-- Sidebar Navigation -->
+            <div class="col-md-2 sidebar p-0 d-flex flex-column d-none d-md-flex">
+                <div class="p-4 brand-title d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-hospital fs-4" style="color:#818cf8"></i>
+                    <span class="fs-5">Citas Médicas</span>
+                </div>
+                <nav class="nav flex-column">
+                    <a class="nav-link active" href="/dashboard"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+                    <a class="nav-link" href="/citas"><i class="bi bi-calendar3"></i> Citas</a>
+                    <a class="nav-link" href="/pacientes"><i class="bi bi-people-fill"></i> Pacientes</a>
+                    <a class="nav-link" href="/mensajes"><i class="bi bi-chat-left-dots-fill"></i> Mensajes</a>
+                    <a class="nav-link" href="/chat"><i class="bi bi-chat-dots-fill"></i> Chat en Vivo <span class="badge-dot ms-auto" id="unread-dot" style="display:none"></span></a>
+                    <a class="nav-link" href="/analytics"><i class="bi bi-bar-chart-line-fill"></i> Analytics</a>
+                    <a class="nav-link" href="/configuracion"><i class="bi bi-gear-fill"></i> Configuración</a>
+                </nav>
+
+                <!-- WhatsApp Status Widget -->
+                <div class="wa-status-widget mx-2 mt-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="wa-dot off" id="ws-status-icon"></span>
+                        <span class="fw-semibold small text-main">WhatsApp Bot</span>
+                    </div>
+                    <div id="ws-status-text" class="small text-muted">Consultando...</div>
+                    <div id="ws-qr-container" class="mt-2 text-center d-none">
+                        <img id="ws-qr-img" src="" alt="Escanee QR" class="img-fluid rounded" style="max-height:120px">
+                        <div class="small mt-1 text-warning">📱 Escanee para conectar</div>
+                    </div>
+                    <button onclick="reconectarWA()" class="btn btn-sm w-100 mt-2">
+                        <i class="bi bi-arrow-repeat me-1"></i>Reconectar
+                    </button>
+                </div>
+
+                <div class="px-3 py-2 mt-auto mb-2">
+                    <button class="btn-sidebar-action mb-2 animate-hover" onclick="toggleDark()">
+                        <i class="bi bi-moon-fill" id="dark-icon"></i> Modo Oscuro
+                    </button>
+                    <a href="/logout" class="btn-sidebar-action btn-sidebar-danger animate-hover">
+                        <i class="bi bi-box-arrow-left"></i> Cerrar Sesión
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 main-content">
+
+                <!-- Banner de advertencia si WA desconectado -->
+                <div id="wa-warning-banner" class="wa-disconnected-banner d-none">
+                    <i class="bi bi-exclamation-triangle-fill fs-5 text-warning"></i>
+                    <div class="flex-grow-1">
+                        <strong>WhatsApp desconectado</strong> — Los recordatorios automáticos NO se enviarán.
+                        Revisa el panel lateral y escanea el código QR para conectar.
+                    </div>
+                    <button onclick="reconectarWA()" class="btn btn-sm btn-warning">
+                        <i class="bi bi-arrow-repeat me-1"></i>Reconectar
+                    </button>
+                </div>
+
+                <!-- Page Header -->
+                <div class="page-header">
+                    <div>
+                        <h2>Panel de Control</h2>
+                        <p>Gestión de citas médicas y comunicación automática vía WhatsApp</p>
+                    </div>
+                    <div class="text-end d-flex align-items-center gap-3">
+                        <span class="antispam-badge d-none d-lg-inline-flex" id="antispam-status">
+                            <i class="bi bi-shield-check"></i> Anti-spam activo
+                        </span>
+                        <span class="badge bg-light text-dark border p-2 fs-6">
+                            <i class="bi bi-calendar-event me-2 text-primary"></i>
+                            <%= new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-muted small fw-medium">Pacientes</span>
+                                    <div class="stat-icon-wrapper bg-primary-soft text-primary">
+                                        <i data-lucide="users" style="width: 18px; height: 18px;"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 class="mb-0 fw-bold"><%= stats.total_pacientes %></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-muted small fw-medium">Pendientes</span>
+                                    <div class="stat-icon-wrapper bg-primary-soft text-primary">
+                                        <i data-lucide="clock" style="width: 18px; height: 18px;"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 class="mb-0 fw-bold text-primary"><%= stats.citas_pendientes %></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-muted small fw-medium">Confirmadas</span>
+                                    <div class="stat-icon-wrapper bg-success-soft text-success">
+                                        <i data-lucide="check-circle" style="width: 18px; height: 18px;"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 class="mb-0 fw-bold text-success"><%= stats.citas_confirmadas %></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-muted small fw-medium">Canceladas</span>
+                                    <div class="stat-icon-wrapper bg-danger-soft text-danger">
+                                        <i data-lucide="x-circle" style="width: 18px; height: 18px;"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 class="mb-0 fw-bold text-danger"><%= stats.citas_canceladas %></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-muted small fw-medium">Reagendadas</span>
+                                    <div class="stat-icon-wrapper bg-info-soft text-info">
+                                        <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 class="mb-0 fw-bold text-info"><%= stats.citas_reagendadas || 0 %></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-muted small fw-medium">Msgs Pendientes</span>
+                                    <div class="stat-icon-wrapper bg-warning-soft text-warning">
+                                        <i data-lucide="message-square" style="width: 18px; height: 18px;"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 class="mb-0 fw-bold text-warning"><%= stats.mensajes_pendientes || 0 %></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Grid -->
+                <div class="row">
+                    <!-- Left Section -->
+                    <div class="col-lg-8">
+
+                        <!-- Quick Actions -->
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <h5 class="fw-bold mb-3"><i class="bi bi-lightning-fill text-warning"></i> Acciones Rápidas</h5>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <a href="/citas/nueva" class="btn btn-primary"><i class="bi bi-calendar-plus me-1"></i>Nueva Cita</a>
+                                    <a href="/pacientes/nuevo" class="btn btn-outline-primary"><i class="bi bi-person-plus me-1"></i>Registrar Paciente</a>
+                                    <a href="/mensajes" class="btn btn-outline-success"><i class="bi bi-chat-text me-1"></i>Enviar WhatsApp</a>
+                                    <button class="btn btn-outline-info" onclick="forzarRecordatorios()"><i class="bi bi-bell-fill me-1"></i>Forzar Recordatorios</button>
+                                    <button class="btn btn-outline-warning" onclick="reintentarFallidos()"><i class="bi bi-arrow-clockwise me-1"></i>Reintentar Fallidos</button>
+                                    <button class="btn btn-outline-secondary" onclick="showTestMsgModal()"><i class="bi bi-send-check me-1"></i>Enviar Mensaje Prueba</button>
+                                </div>
+                                <div id="quickActionResult" class="mt-3" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Workload Weekly Chart -->
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart-line text-primary me-2"></i>Carga de Trabajo Semanal</h5>
+                                <div style="height: 180px; position: relative;">
+                                    <canvas id="workloadChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upcoming Appointments -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <h5 class="fw-bold mb-0"><i class="bi bi-calendar-week text-primary me-2"></i>Próximas Citas</h5>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Filtro de citas">
+                                        <button type="button" class="btn btn-outline-secondary active" onclick="filterCitas('todas', this)">Todas</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="filterCitas('hoy', this)">Hoy</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="filterCitas('manana', this)">Mañana</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="filterCitas('semana', this)">Esta Semana</button>
+                                    </div>
+                                    <a href="/citas" class="btn btn-sm btn-light">Ver todo <i class="bi bi-arrow-right"></i></a>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <% if (citas.length > 0) { %>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Paciente</th>
+                                                    <th>Fecha</th>
+                                                    <th>Hora</th>
+                                                    <th>Motivo</th>
+                                                    <th>Estado</th>
+                                                    <th class="text-end pe-4">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="citas-table-body">
+                                                <% citas.forEach(cita => { %>
+                                                    <tr data-fecha="<%= cita.fecha %>">
+                                                        <td class="fw-semibold">
+                                                            <%= cita.paciente_nombre %>
+                                                            <br>
+                                                            <small class="text-muted" style="font-size:0.75rem;"><%= cita.paciente_telefono %></small>
+                                                        </td>
+                                                        <td><%= new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-ES') %></td>
+                                                        <td class="fw-semibold text-primary"><%= cita.hora.substring(0, 5) %></td>
+                                                        <td><span class="text-muted"><%= cita.motivo %></span></td>
+                                                        <td>
+                                                            <% if (cita.estado === 'confirmada') { %>
+                                                                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Confirmada</span>
+                                                            <% } else if (cita.estado === 'cancelada') { %>
+                                                                <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>Cancelada</span>
+                                                            <% } else if (cita.estado === 'reagendada') { %>
+                                                                <span class="badge bg-info text-dark"><i class="bi bi-arrow-repeat me-1"></i>Reagendada</span>
+                                                            <% } else { %>
+                                                                <span class="badge bg-warning text-dark"><i class="bi bi-clock-fill me-1"></i>Pendiente</span>
+                                                            <% } %>
+                                                        </td>
+                                                        <td class="text-end pe-4">
+                                                            <a href="/chat?phone=<%= cita.paciente_telefono %>" class="btn btn-sm btn-outline-primary" style="border-radius: 20px; font-size: 0.8rem; padding: 4px 12px;">
+                                                                <i class="bi bi-chat-dots-fill me-1"></i> Chat
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                <% }); %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <% } else { %>
+                                    <div class="text-center py-5 text-muted">
+                                        <i class="bi bi-calendar-x fs-1 opacity-50"></i>
+                                        <p class="mt-2 mb-0">No hay citas médicas programadas para los próximos días.</p>
+                                        <a href="/citas/nueva" class="btn btn-sm btn-primary mt-3"><i class="bi bi-plus me-1"></i>Crear primera cita</a>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <!-- Reminders Stats -->
+                        <% if (typeof recordatoriosStats !== 'undefined' && recordatoriosStats) { %>
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0"><i class="bi bi-chat-left-text text-primary me-2"></i>Estado de Mensajería WhatsApp</h5>
+                                <% const totalCitas = (stats.citas_confirmadas || 0) + (stats.citas_pendientes || 0);
+                                   const tasaConfirmacion = totalCitas > 0 ? Math.round((stats.citas_confirmadas / totalCitas) * 100) : 0; %>
+                                <span class="badge bg-light text-dark border">Confirmación: <strong><%= tasaConfirmacion %>%</strong></span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-4 col-6 border-end py-2">
+                                        <h4 class="fw-bold text-success"><%= recordatoriosStats.enviados || 0 %></h4>
+                                        <small class="text-muted">Mensajes Enviados</small>
+                                    </div>
+                                    <div class="col-md-4 col-6 border-end py-2">
+                                        <h4 class="fw-bold text-danger"><%= recordatoriosStats.fallidos || 0 %></h4>
+                                        <small class="text-muted">Mensajes Fallidos</small>
+                                    </div>
+                                    <div class="col-md-4 col-12 py-2">
+                                        <h4 class="fw-bold text-primary"><%= recordatoriosStats.citas_manana || 0 %></h4>
+                                        <small class="text-muted">Recordatorios para Mañana</small>
+                                    </div>
+                                </div>
+                                <!-- Barra de tasa de confirmación -->
+                                <div class="mt-3">
+                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                        <span>Tasa de confirmación</span>
+                                        <span><%= tasaConfirmacion %>%</span>
+                                    </div>
+                                    <div class="progress" style="height:8px;border-radius:8px;">
+                                        <div class="progress-bar bg-success" style="width:<%= tasaConfirmacion %>%;border-radius:8px;" role="progressbar"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <% } %>
+                    </div>
+
+                    <!-- Right Section -->
+                    <div class="col-lg-4">
+
+                        <!-- Bot Guide -->
+                        <div class="card mb-4 border-start border-primary border-4">
+                            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center py-3" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#chatbotGuideCollapse" aria-expanded="true" onclick="toggleGuideIcon(this)">
+                                <h5 class="fw-bold mb-0"><i class="bi bi-question-circle text-primary me-2"></i>Guía del Chatbot</h5>
+                                <i class="bi bi-chevron-up text-muted" id="guide-chevron-icon"></i>
+                            </div>
+                            <div class="collapse show" id="chatbotGuideCollapse">
+                                <div class="card-body pt-0">
+                                    <div class="guide-step">
+                                        <div class="guide-step-icon">1</div>
+                                        <div class="guide-step-content">
+                                            <h6>Registro y Envío</h6>
+                                            <p>Registra citas con estado <strong>Pendiente</strong>. El sistema enviará un WhatsApp al paciente 24 horas antes solicitando confirmación.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="guide-step">
+                                        <div class="guide-step-icon">2</div>
+                                        <div class="guide-step-content">
+                                            <h6>Respuestas y Flujos</h6>
+                                            <ul class="ps-3 mt-1 mb-0 text-muted" style="font-size:0.85rem;">
+                                                <li><strong>Confirmar ("Si" / "1"):</strong> Cita pasa a <span class="text-success fw-bold">confirmada</span>.</li>
+                                                <li><strong>Cancelar ("No" / "2"):</strong> Cita pasa a <span class="text-danger fw-bold">cancelada</span>.</li>
+                                                <li><strong>Reagendar ("Reagendar" / "3"):</strong> Muestra 5 fechas sugeridas con horarios libres. El paciente puede responder con el número (1-5) o fecha manual.</li>
+                                                <li><strong>Chat en Vivo Silencioso:</strong> El chatbot no responderá a mensajes libres fuera del flujo, permitiéndote chatear manualmente sin interrupciones.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    <div class="guide-step mb-3">
+                                        <div class="guide-step-icon">3</div>
+                                        <div class="guide-step-content">
+                                            <h6>Protección Anti-Spam</h6>
+                                            <p>El sistema envía mensajes solo entre <strong>8:00 AM – 9:00 PM</strong> con delays aleatorios y rotación de plantillas.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="alert alert-warning py-2 px-3 mb-0" style="font-size:0.83rem;border-radius:12px;">
+                                        <i class="bi bi-info-circle-fill me-1"></i>
+                                        <strong>Conexión:</strong> Verifica que el <span class="badge bg-success" style="font-size:0.75rem;">● Conectado</span> aparezca en el panel lateral antes de procesar mensajes.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Patients -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0"><i class="bi bi-people text-primary me-2"></i>Pacientes Recientes</h5>
+                                <a href="/pacientes" class="btn btn-sm btn-light">Todos</a>
+                            </div>
+                            <div class="card-body p-0">
+                                <% if (pacientes.length > 0) { %>
+                                    <div class="list-group list-group-flush">
+                                        <% pacientes.forEach(paciente => { %>
+                                            <div class="list-group-item d-flex justify-content-between align-items-center px-4 py-3">
+                                                <div>
+                                                    <h6 class="mb-0 fw-semibold"><%= paciente.nombre %></h6>
+                                                    <small class="text-muted"><i class="bi bi-whatsapp text-success me-1"></i><%= paciente.telefono %></small>
+                                                </div>
+                                                <a href="/mensajes" class="btn btn-sm btn-light text-success" title="Enviar mensaje">
+                                                    <i class="bi bi-chat-right-text"></i>
+                                                </a>
+                                            </div>
+                                        <% }); %>
+                                    </div>
+                                <% } else { %>
+                                    <div class="text-center py-4 text-muted">
+                                        <p class="mb-0">No hay pacientes registrados.</p>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Enviar Mensaje de Prueba -->
+    <div class="modal fade" id="testMsgModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-send-check me-2 text-primary"></i>Enviar Mensaje de Prueba</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Envía un mensaje de prueba a cualquier número para verificar que WhatsApp está funcionando correctamente.</p>
+                    <label class="form-label fw-semibold">Número de teléfono (10 dígitos)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-phone"></i></span>
+                        <input type="text" id="test-phone-input" class="form-control" placeholder="Ej: 7221234567" maxlength="15">
+                    </div>
+                    <div id="test-msg-result" class="test-msg-result"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="enviarMensajePrueba()">
+                        <i class="bi bi-send-fill me-1"></i>Enviar Prueba
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // ── Dark Mode ─────────────────────────────────────────────
+        function toggleDark() {
+            const html = document.documentElement;
+            const isDark = html.getAttribute('data-theme') === 'dark';
+            const nextTheme = isDark ? '' : 'dark';
+            html.setAttribute('data-theme', nextTheme);
+            html.setAttribute('data-bs-theme', nextTheme === 'dark' ? 'dark' : 'light');
+            
+            const icon = document.getElementById('dark-icon');
+            if (icon) {
+                icon.className = isDark ? 'bi bi-moon-fill' : 'bi bi-sun-fill';
+                const parent = icon.parentElement;
+                if (parent) {
+                    parent.innerHTML = isDark
+                        ? '<i class="bi bi-moon-fill" id="dark-icon"></i> Modo Oscuro'
+                        : '<i class="bi bi-sun-fill" id="dark-icon"></i> Modo Claro';
+                }
+            }
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        }
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+            // Esperar a que el DOM esté cargado para actualizar el botón
+            document.addEventListener('DOMContentLoaded', () => {
+                const icon = document.getElementById('dark-icon');
+                if (icon) {
+                    icon.className = 'bi bi-sun-fill';
+                    const parent = icon.parentElement;
+                    if (parent) {
+                        parent.innerHTML = '<i class="bi bi-sun-fill" id="dark-icon"></i> Modo Claro';
+                    }
+                }
+            });
+        }
+
+        // Solicitar permiso de notificaciones nativas en el navegador
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+
+        // Sintetizador de audio chime clínico agradable
+        function playNotificationSound() {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                
+                const osc1 = context.createOscillator();
+                const gain1 = context.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(523.25, context.currentTime); // C5
+                gain1.gain.setValueAtTime(0.08, context.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.25);
+                osc1.connect(gain1);
+                gain1.connect(context.destination);
+                osc1.start();
+                osc1.stop(context.currentTime + 0.25);
+
+                setTimeout(() => {
+                    const osc2 = context.createOscillator();
+                    const gain2 = context.createGain();
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(659.25, context.currentTime); // E5
+                    gain2.gain.setValueAtTime(0.08, context.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.4);
+                    osc2.connect(gain2);
+                    gain2.connect(context.destination);
+                    osc2.start();
+                    osc2.stop(context.currentTime + 0.4);
+                }, 80);
+            } catch (e) {
+                console.warn('AudioContext no soportado:', e);
+            }
+        }
+
+        // Notificación nativa push (redirecciona al chat en vivo)
+        function sendNativeNotification(title, body, phone) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                const notification = new Notification(title, {
+                    body: body,
+                    tag: 'wasap-msg',
+                    renotify: true
+                });
+                notification.onclick = () => {
+                    window.focus();
+                    window.location.href = `/chat?phone=${phone}`;
+                };
+            }
+        }
+
+        // ── Unread count ──────────────────────────────────────────
+        async function loadUnreadCount() {
+            try {
+                const res = await fetch('/api/chat/no-leidos');
+                const data = await res.json();
+                const dot = document.getElementById('unread-dot');
+                if (dot) dot.style.display = data.count > 0 ? 'inline-block' : 'none';
+            } catch (e) {}
+        }
+        loadUnreadCount();
+
+        // ── Anti-spam status badge ────────────────────────────────
+        async function loadSistemaEstado() {
+            try {
+                const res = await fetch('/api/sistema/estado');
+                const data = await res.json();
+                const badge = document.getElementById('antispam-status');
+                if (badge) {
+                    if (!data.antispam.ventanaSegura) {
+                        badge.innerHTML = '<i class="bi bi-clock-history"></i> Envíos en pausa (fuera de horario)';
+                        badge.style.background = 'linear-gradient(135deg,#fee2e2,#fecaca)';
+                        badge.style.borderColor = '#ef4444';
+                        badge.style.color = '#991b1b';
+                    }
+                }
+            } catch (e) {}
+        }
+        loadSistemaEstado();
+
+        // ── SSE para actualizaciones en tiempo real ───────────────
+        const sseConn = new EventSource('/api/updates/live');
+
+        sseConn.addEventListener('wa_status', e => {
+            const d = JSON.parse(e.data);
+            const dot = document.getElementById('ws-status-icon');
+            const text = document.getElementById('ws-status-text');
+            const qrContainer = document.getElementById('ws-qr-container');
+            const qrImg = document.getElementById('ws-qr-img');
+            const banner = document.getElementById('wa-warning-banner');
+
+            if (d.status === 'conectado') {
+                if (dot) { dot.className = 'wa-dot on'; }
+                if (text) text.innerText = '✅ Conectado y listo';
+                if (qrContainer) qrContainer.classList.add('d-none');
+                if (banner) banner.classList.add('d-none');
+            } else {
+                if (dot) { dot.className = 'wa-dot off'; }
+                if (text) text.innerText = `⚠️ ${d.status === 'qr_listo' ? 'Escanea el QR' : 'Desconectado'}`;
+                if (banner) banner.classList.remove('d-none');
+                if (d.qr || d.qrCode) {
+                    if (qrImg) qrImg.src = d.qr || d.qrCode;
+                    if (qrContainer) qrContainer.classList.remove('d-none');
+                }
+            }
+        });
+
+        sseConn.addEventListener('mensaje', e => {
+            const d = JSON.parse(e.data);
+            if (d.remitente === 'paciente') {
+                const dot = document.getElementById('unread-dot');
+                if (dot) dot.style.display = 'inline-block';
+                playNotificationSound();
+                if (document.hidden) {
+                    sendNativeNotification(`💬 Mensaje de Paciente`, d.texto, d.telefono);
+                }
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (sseConn) sseConn.close();
+        });
+
+        // ── SweetAlert2 Toast configuration ───────────────────────
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
+
+        // ── Acciones rápidas con SweetAlert2 ──────────────────────
+        async function forzarRecordatorios() {
+            Swal.fire({
+                title: 'Procesando recordatorios',
+                text: 'Buscando citas de mañana para enviar avisos...',
+                icon: 'info',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+            try {
+                const res = await fetch('/api/recordatorios/forzar', { method: 'POST' });
+                const data = await res.json();
+                const msg = data.mensaje || `Se procesaron los recordatorios correctamente.`;
+                Swal.fire({
+                    title: '¡Procesados!',
+                    text: msg,
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                setTimeout(() => location.reload(), 2000);
+            } catch (err) {
+                Swal.fire('Error', 'No se pudieron forzar los recordatorios.', 'error');
+            }
+        }
+
+        async function reintentarFallidos() {
+            Swal.fire({
+                title: 'Reintentando envíos',
+                text: 'Reenviando mensajes fallidos y pendientes...',
+                icon: 'info',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+            try {
+                const res = await fetch('/api/recordatorios/reintentar', { method: 'POST' });
+                const data = await res.json();
+                const r = data.resultado;
+                Swal.fire({
+                    title: 'Completado',
+                    text: `Éxito: ${r.exitosos}/${r.reintentados} mensajes reenviados.`,
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                setTimeout(() => location.reload(), 2000);
+            } catch (err) {
+                Swal.fire('Error', 'No se pudieron reintentar los mensajes.', 'error');
+            }
+        }
+
+        async function reconectarWA() {
+            Toast.fire({
+                icon: 'info',
+                title: 'Reconectando WhatsApp...'
+            });
+            try {
+                await fetch('/api/whatsapp/reconectar', { method: 'POST' });
+            } catch (e) {}
+        }
+
+        // ── Modal: Mensaje de prueba con SweetAlert2 ──────────────
+        function showTestMsgModal() {
+            document.getElementById('test-phone-input').value = '';
+            document.getElementById('test-msg-result').style.display = 'none';
+            new bootstrap.Modal(document.getElementById('testMsgModal')).show();
+        }
+
+        async function enviarMensajePrueba() {
+            const telefono = document.getElementById('test-phone-input').value.trim();
+            const resultDiv = document.getElementById('test-msg-result');
+            if (!telefono || telefono.length < 10) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-warning py-2 px-3 mb-0 mt-2">Ingresa un número de 10 dígitos válido.</div>';
+                return;
+            }
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="alert alert-info py-2 px-3 mb-0 mt-2"><i class="bi bi-hourglass-split me-1"></i> Enviando mensaje...</div>';
+            try {
+                const res = await fetch('/api/mensajes/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telefono })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('testMsgModal')).hide();
+                    Swal.fire('Enviado', `Mensaje enviado correctamente a +${data.telefono}`, 'success');
+                } else {
+                    resultDiv.innerHTML = `<div class="alert alert-danger py-2 px-3 mb-0 mt-2"><i class="bi bi-exclamation-triangle-fill me-1"></i> Error: ${data.error || 'No se pudo enviar'}</div>`;
+                }
+            } catch (err) {
+                resultDiv.innerHTML = '<div class="alert alert-danger py-2 px-3 mb-0 mt-2">Error de conexión con el servidor.</div>';
+            }
+        }
+
+        // ── Filtro de Citas ───────────────────────────────────────
+        function filterCitas(type, btn) {
+            const container = btn.parentElement;
+            container.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const rows = document.querySelectorAll('#citas-table-body tr');
+            const hoy = new Date();
+            hoy.setHours(0,0,0,0);
+
+            const manana = new Date(hoy);
+            manana.setDate(manana.getDate() + 1);
+
+            const finSemana = new Date(hoy);
+            finSemana.setDate(finSemana.getDate() + 7);
+
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const fechaStr = row.dataset.fecha;
+                if (!fechaStr) return;
+                const rowDate = new Date(fechaStr + 'T00:00:00');
+                rowDate.setHours(0,0,0,0);
+
+                let show = false;
+                if (type === 'todas') show = true;
+                else if (type === 'hoy') show = rowDate.getTime() === hoy.getTime();
+                else if (type === 'manana') show = rowDate.getTime() === manana.getTime();
+                else if (type === 'semana') show = rowDate >= hoy && rowDate <= finSemana;
+
+                if (show) {
+                    row.classList.remove('d-none');
+                    visibleCount++;
+                } else {
+                    row.classList.add('d-none');
+                }
+            });
+
+            const emptyRow = document.getElementById('citas-empty-row');
+            if (visibleCount === 0) {
+                if (!emptyRow) {
+                    const tr = document.createElement('tr');
+                    tr.id = 'citas-empty-row';
+                    tr.innerHTML = `<td colspan="6" class="text-center py-4 text-muted"><i class="bi bi-calendar-x me-1"></i> No hay citas para este filtro.</td>`;
+                    document.getElementById('citas-table-body').appendChild(tr);
+                } else {
+                    emptyRow.classList.remove('d-none');
+                }
+            } else {
+                if (emptyRow) emptyRow.classList.add('d-none');
+            }
+        }
+
+        // ── Toggle de Guía Chevron ────────────────────────────────
+        function toggleGuideIcon(el) {
+            const icon = document.getElementById('guide-chevron-icon');
+            if (icon) {
+                setTimeout(() => {
+                    const isCollapsed = !document.getElementById('chatbotGuideCollapse').classList.contains('show');
+                    icon.className = isCollapsed ? 'bi bi-chevron-down text-muted' : 'bi bi-chevron-up text-muted';
+                }, 350);
+            }
+        }
+
+        // ── Inicializaciones ──────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+
+            // Iniciar gráfico de carga de trabajo (Chart.js)
+            const statsData = <%- JSON.stringify(proximasCitasStats || []) %>;
+            
+            const labels = [];
+            const dataPoints = [];
+            const hoy = new Date();
+
+            for (let i = 0; i < 7; i++) {
+                const tempDate = new Date(hoy);
+                tempDate.setDate(hoy.getDate() + i);
+                
+                const yyyy = tempDate.getFullYear();
+                const mm = String(tempDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(tempDate.getDate()).padStart(2, '0');
+                const isoStr = `${yyyy}-${mm}-${dd}`;
+                
+                const dayLabelName = tempDate.toLocaleDateString('es-ES', { weekday: 'short' });
+                const capitalizedDay = dayLabelName.charAt(0).toUpperCase() + dayLabelName.slice(1);
+                labels.push(`${capitalizedDay} ${dd}/${mm}`);
+
+                const statFound = statsData.find(s => s.fecha === isoStr);
+                dataPoints.push(statFound ? statFound.cantidad : 0);
+            }
+
+            const ctx = document.getElementById('workloadChart').getContext('2d');
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+            gradient.addColorStop(0, '#6366f1');
+            gradient.addColorStop(1, '#818cf8');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Número de Citas',
+                        data: dataPoints,
+                        backgroundColor: gradient,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                        barPercentage: 0.55
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, color: '#94a3b8' },
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

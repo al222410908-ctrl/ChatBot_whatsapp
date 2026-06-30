@@ -58,9 +58,10 @@ const PROJECT_DIR = process.pkg
   ? path.dirname(process.execPath)
   : __dirname;
 
-const DASHBOARD_SCRIPT = path.join(PROJECT_DIR, 'dashboard.js');
-const NODE_MODULES     = path.join(PROJECT_DIR, 'node_modules');
-const PACKAGE_JSON     = path.join(PROJECT_DIR, 'package.json');
+const BACKEND_DIR      = path.join(PROJECT_DIR, 'backend');
+const DASHBOARD_SCRIPT = path.join(BACKEND_DIR, 'dashboard.js');
+const NODE_MODULES     = path.join(BACKEND_DIR, 'node_modules');
+const PACKAGE_JSON     = path.join(BACKEND_DIR, 'package.json');
 
 let serverProcess = null;
 let isShuttingDown = false;
@@ -203,7 +204,7 @@ function installDependencies() {
 
   try {
     const result = execSync('npm install', {
-      cwd: PROJECT_DIR,
+      cwd: BACKEND_DIR,
       stdio: 'inherit',
       timeout: 300000, // 5 min máximo
     });
@@ -222,7 +223,7 @@ function installDependencies() {
 function readPin() {
   const envFiles = ['.env.local', '.env'];
   for (const file of envFiles) {
-    const filePath = path.join(PROJECT_DIR, file);
+    const filePath = path.join(BACKEND_DIR, file);
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, 'utf-8');
       const match = content.match(/DASHBOARD_PIN=(\S+)/);
@@ -236,7 +237,7 @@ function readPin() {
 function readPort() {
   const envFiles = ['.env.local', '.env'];
   for (const file of envFiles) {
-    const filePath = path.join(PROJECT_DIR, file);
+    const filePath = path.join(BACKEND_DIR, file);
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, 'utf-8');
       const match = content.match(/PORT=(\d+)/);
@@ -253,7 +254,7 @@ function startServer(port) {
 
     const nodeExe = findNodePath() || 'node';
     serverProcess = spawn(nodeExe, ['dashboard.js'], {
-      cwd: PROJECT_DIR,
+      cwd: BACKEND_DIR,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, FORCE_COLOR: '1' },
       windowsHide: false,
@@ -433,7 +434,7 @@ async function main() {
 
   // Paso 5: Verificar que dashboard.js existe
   if (!fs.existsSync(DASHBOARD_SCRIPT)) {
-    logErr(`No se encontró dashboard.js en: ${PROJECT_DIR}`);
+    logErr(`No se encontró dashboard.js en: ${BACKEND_DIR}`);
     logWarn('Asegúrate de que el .exe esté en la carpeta del proyecto.');
     waitForEnter('Presiona Enter para salir...');
     process.exit(1);
