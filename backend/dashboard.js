@@ -1561,6 +1561,54 @@ app.post('/api/whatsapp/reconectar', async (req, res) => {
   }
 });
 
+app.post('/api/whatsapp/logout', async (req, res) => {
+  try {
+    console.log('🔌 Recibida petición de cierre de sesión de WhatsApp...');
+    
+    // 1. Desconectar de forma limpia si hay cliente activo
+    if (waClient) {
+      try {
+        await waClient.logout();
+        console.log('✅ Cierre de sesión enviado a whatsapp-web.js');
+      } catch (e) {
+        console.warn('⚠️ Error al hacer logout en whatsapp-web.js, forzando destrucción:', e.message);
+        try {
+          await waClient.destroy();
+        } catch (destroyError) { /* ignorar */ }
+      }
+      waClient = null;
+    }
+
+    // 2. Eliminar la carpeta de la sesión para asegurar que no se vuelva a autenticar con los mismos datos
+    const sessionPath = path.join(__dirname, 'data', 'sessions');
+    const currentSessionName = process.env.WA_SESSION_NAME || 'sesion-doctor';
+    const specificSessionPath = path.join(sessionPath, `session-${currentSessionName}`);
+    if (fs.existsSync(specificSessionPath)) {
+      try {
+        fs.rmSync(specificSessionPath, { recursive: true, force: true });
+        console.log('🧹 [WA] Carpeta de sesión eliminada por logout del panel');
+      } catch (err) {
+        console.warn(`⚠️ [WA] No se pudo eliminar la carpeta de sesión: ${err.message}`);
+      }
+    }
+
+    // 3. Reiniciar variables de estado
+    waStatus = 'desconectado';
+    waPhone = null;
+    waQr = null;
+    emitSSE('wa_status', { status: waStatus, qr: null });
+
+    // 4. Arrancar de nuevo el bot para que genere un nuevo QR automáticamente
+    reconectando = false;
+    inicializarWhatsApp();
+
+    res.json({ success: true, message: 'Sesión de WhatsApp cerrada correctamente. Generando nuevo QR...' });
+  } catch (error) {
+    console.error('Error al cerrar sesión de WhatsApp:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/updates/live', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');

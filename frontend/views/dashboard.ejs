@@ -119,6 +119,9 @@
                     <button onclick="reconectarWA()" class="btn btn-sm w-100 mt-2">
                         <i class="bi bi-arrow-repeat me-1"></i>Reconectar
                     </button>
+                    <button id="ws-logout-btn" onclick="logoutWA()" class="btn btn-sm btn-outline-danger w-100 mt-1 d-none">
+                        <i class="bi bi-box-arrow-left me-1"></i>Cerrar Sesión Bot
+                    </button>
                 </div>
 
                 <div class="px-3 py-2 mt-auto mb-2">
@@ -659,12 +662,14 @@
             const qrContainer = document.getElementById('ws-qr-container');
             const qrImg = document.getElementById('ws-qr-img');
             const banner = document.getElementById('wa-warning-banner');
+            const logoutBtn = document.getElementById('ws-logout-btn');
 
             if (d.status === 'conectado') {
                 if (dot) { dot.className = 'wa-dot on'; }
                 if (text) text.innerText = '✅ Conectado y listo';
                 if (qrContainer) qrContainer.classList.add('d-none');
                 if (banner) banner.classList.add('d-none');
+                if (logoutBtn) logoutBtn.classList.remove('d-none');
             } else {
                 if (dot) { dot.className = 'wa-dot off'; }
                 if (text) text.innerText = `⚠️ ${d.status === 'qr_listo' ? 'Escanea el QR' : 'Desconectado'}`;
@@ -673,6 +678,7 @@
                     if (qrImg) qrImg.src = d.qr || d.qrCode;
                     if (qrContainer) qrContainer.classList.remove('d-none');
                 }
+                if (logoutBtn) logoutBtn.classList.add('d-none');
             }
         });
 
@@ -764,6 +770,42 @@
             try {
                 await fetch('/api/whatsapp/reconectar', { method: 'POST' });
             } catch (e) {}
+        }
+
+        async function logoutWA() {
+            const result = await Swal.fire({
+                title: '¿Cerrar sesión de WhatsApp?',
+                text: 'Se desconectará tu número actual del sistema y tendrás que escanear un nuevo código QR.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Sí, desconectar',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (!result.isConfirmed) return;
+
+            Toast.fire({
+                icon: 'info',
+                title: 'Cerrando sesión de WhatsApp...'
+            });
+
+            try {
+                const res = await fetch('/api/whatsapp/logout', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    Swal.fire(
+                        'Desconectado',
+                        'Sesión de WhatsApp cerrada con éxito. El bot se está reiniciando para generar un nuevo QR.',
+                        'success'
+                    );
+                } else {
+                    Swal.fire('Error', data.message || 'No se pudo cerrar la sesión.', 'error');
+                }
+            } catch (e) {
+                Swal.fire('Error', 'Error al intentar cerrar la sesión: ' + e.message, 'error');
+            }
         }
 
         // ── Modal: Mensaje de prueba con SweetAlert2 ──────────────
