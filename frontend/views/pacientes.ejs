@@ -12,6 +12,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Estilos compartidos -->
         <link rel="stylesheet" href="/css/app.css">
+        <script src="/js/mobile-toggle.js" defer></script>
     <script>
         (function() {
             const t = localStorage.getItem('theme');
@@ -81,11 +82,22 @@
                         <h2>Gestión de Pacientes</h2>
                         <p>Directorio de pacientes registrados en el sistema del consultorio</p>
                     </div>
-                    <a href="/pacientes/nuevo" class="btn btn-primary">
+                    <a href="/pacientes/nuevo" class="btn btn-primary d-none d-md-inline-block">
                         <i class="bi bi-person-plus me-1"></i> Registrar Paciente
                     </a>
                 </div>
 
+                <!-- Tarjeta Informativa Móvil (Pacientes optimizados para PC) -->
+                <div class="card mb-4 d-block d-md-none border-start border-primary border-4 animate-slide-in">
+                    <div class="card-body py-4 text-center">
+                        <i class="bi bi-display text-primary fs-1 mb-3 d-block"></i>
+                        <h5 class="fw-bold mb-2 text-main">Directorio de Pacientes Optimizado para PC</h5>
+                        <p class="text-muted mb-4 small">El listado completo de pacientes registrados, el historial de consultas y las opciones de edición están diseñados para su visualización en pantallas de PC.</p>
+                        <a href="/dashboard" class="btn btn-primary btn-sm"><i class="bi bi-grid-1x2 me-1"></i> Volver al Dashboard</a>
+                    </div>
+                </div>
+
+                <div class="d-none d-md-block">
                 <div class="card">
                     <div class="card-body p-0">
                         <% if (pacientes.length > 0) { %>
@@ -131,8 +143,8 @@
                                 </a>
                             </div>
                         <% } %>
-                    </div>
                 </div>
+                </div> <!-- Cierre de d-none d-md-block -->
             </div>
         </div>
     </div>

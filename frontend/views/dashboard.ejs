@@ -15,6 +15,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Estilos compartidos -->
         <link rel="stylesheet" href="/css/app.css">
+        <script src="/js/mobile-toggle.js" defer></script>
     <script>
         (function() {
             const t = localStorage.getItem('theme');
@@ -133,6 +134,15 @@
             <!-- Main Content -->
             <div class="col-md-10 main-content">
 
+                <!-- Mobile Header Toggle Bar -->
+                <div class="d-flex d-md-none justify-content-between align-items-center mb-3 p-3 border-bottom sticky-top" style="margin: -15px -16px 20px -16px; background-color: var(--surface-color); z-index: 100; border-radius: 0;">
+                    <button class="btn btn-outline-secondary btn-sm" id="sidebarToggleMobile">
+                        <i class="bi bi-list fs-4"></i>
+                    </button>
+                    <span class="fw-bold text-main">🏥 Citas Médicas</span>
+                    <div style="width: 40px;"></div> <!-- placeholder to center title -->
+                </div>
+
                 <!-- Banner de advertencia si WA desconectado -->
                 <div id="wa-warning-banner" class="wa-disconnected-banner d-none">
                     <i class="bi bi-exclamation-triangle-fill fs-5 text-warning"></i>
@@ -164,7 +174,7 @@
 
                 <!-- Stats Cards -->
                 <div class="row mb-4">
-                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="col-6 col-sm-4 col-xl-2 mb-3">
                         <div class="card stat-card h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -179,7 +189,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="col-6 col-sm-4 col-xl-2 mb-3">
                         <div class="card stat-card h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -194,7 +204,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="col-12 col-sm-4 col-xl-2 mb-3">
                         <div class="card stat-card h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -209,7 +219,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3 d-none d-md-block">
                         <div class="card stat-card h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -224,7 +234,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3 d-none d-md-block">
                         <div class="card stat-card h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -239,7 +249,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3 d-none d-md-block">
                         <div class="card stat-card h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -262,7 +272,7 @@
                     <div class="col-lg-8">
 
                         <!-- Quick Actions -->
-                        <div class="card mb-4">
+                        <div class="card mb-4 d-none d-md-block">
                             <div class="card-body">
                                 <h5 class="fw-bold mb-3"><i class="bi bi-lightning-fill text-warning"></i> Acciones Rápidas</h5>
                                 <div class="d-flex gap-2 flex-wrap">
@@ -278,11 +288,24 @@
                         </div>
 
                         <!-- Workload Weekly Chart -->
-                        <div class="card mb-4">
+                        <div class="card mb-4 d-none d-md-block">
                             <div class="card-body">
                                 <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart-line text-primary me-2"></i>Carga de Trabajo Semanal</h5>
                                 <div style="height: 180px; position: relative;">
                                     <canvas id="workloadChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tarjeta Informativa Móvil (Acciones en PC) -->
+                        <div class="card mb-4 d-block d-md-none border-start border-primary border-4 animate-slide-in">
+                            <div class="card-body py-3">
+                                <div class="d-flex align-items-center gap-3">
+                                    <i class="bi bi-display text-primary fs-3"></i>
+                                    <div>
+                                        <h6 class="fw-bold mb-1 text-main" style="font-size:0.9rem;">Acciones Administrativas en PC</h6>
+                                        <p class="text-muted mb-0" style="font-size:0.8rem;">Los gráficos semanales, la configuración avanzada y el reenvío de recordatorios están optimizados para ordenadores de escritorio.</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -357,9 +380,9 @@
                             </div>
                         </div>
 
-                        <!-- Reminders Stats -->
+                        <!-- Reminders Stats (Oculto en móviles) -->
                         <% if (typeof recordatoriosStats !== 'undefined' && recordatoriosStats) { %>
-                        <div class="card mb-4">
+                        <div class="card mb-4 d-none d-md-block">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h5 class="fw-bold mb-0"><i class="bi bi-chat-left-text text-primary me-2"></i>Estado de Mensajería WhatsApp</h5>
                                 <% const totalCitas = (stats.citas_confirmadas || 0) + (stats.citas_pendientes || 0);
@@ -396,8 +419,8 @@
                         <% } %>
                     </div>
 
-                    <!-- Right Section -->
-                    <div class="col-lg-4">
+                    <!-- Right Section (Guía y Pacientes Recientes - ocultos en móvil) -->
+                    <div class="col-lg-4 d-none d-md-block">
 
                         <!-- Bot Guide -->
                         <div class="card mb-4 border-start border-primary border-4">
@@ -909,6 +932,7 @@
                         }
                     }
                 }
+            });
             });
         });
     </script>

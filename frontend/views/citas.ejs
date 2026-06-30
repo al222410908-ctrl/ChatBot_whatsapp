@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <!-- Estilos compartidos -->
         <link rel="stylesheet" href="/css/app.css">
+        <script src="/js/mobile-toggle.js" defer></script>
     <script>
         (function() {
             const t = localStorage.getItem('theme');
@@ -241,14 +242,25 @@
                         <h2 class="fw-bold mb-1">Gestión de Citas</h2>
                         <p class="text-muted mb-0">Listado y calendario de todas las consultas médicas</p>
                     </div>
-                    <div class="d-inline-flex gap-2">
+                    <div class="d-inline-flex gap-2 d-none d-md-inline-flex">
                         <a href="/api/citas/exportar-csv" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar CSV</a>
                         <a href="/citas/nueva" class="btn btn-primary text-white"><i class="bi bi-calendar-plus me-1"></i> Nueva Cita</a>
                     </div>
                 </div>
 
-                <!-- Tabs header -->
-                <ul class="nav nav-pills mb-4" id="citasTabs" role="tablist">
+                <!-- Tarjeta Informativa Móvil (Citas optimizadas para PC) -->
+                <div class="card mb-4 d-block d-md-none border-start border-primary border-4 animate-slide-in">
+                    <div class="card-body py-4 text-center">
+                        <i class="bi bi-display text-primary fs-1 mb-3 d-block"></i>
+                        <h5 class="fw-bold mb-2 text-main">Agenda y Calendario Optimizado para PC</h5>
+                        <p class="text-muted mb-4 small">El listado completo de citas, la exportación de planillas CSV y el calendario visual interactivo están diseñados para pantallas de ordenadores de escritorio.</p>
+                        <a href="/dashboard" class="btn btn-primary btn-sm"><i class="bi bi-grid-1x2 me-1"></i> Volver al Dashboard</a>
+                    </div>
+                </div>
+
+                <!-- Tabs header & content (ocultos en móvil) -->
+                <div class="d-none d-md-block">
+                    <ul class="nav nav-pills mb-4" id="citasTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="listado-tab" data-bs-toggle="tab" data-bs-target="#listado-tab-pane" type="button" role="tab"><i class="bi bi-list-task me-1"></i> Listado de Citas</button>
                     </li>
@@ -388,6 +400,7 @@
                         </div>
                     </div>
                 </div>
+                </div> <!-- Cierre de d-none d-md-block -->
             </div>
         </div>
     </div>

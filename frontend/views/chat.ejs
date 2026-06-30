@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <!-- Estilos compartidos -->
         <link rel="stylesheet" href="/css/app.css">
+        <script src="/js/mobile-toggle.js" defer></script>
     <script>
         (function() {
             const t = localStorage.getItem('theme');
@@ -395,6 +396,17 @@
                     </div>
                 </div>
 
+                <!-- Tarjeta Informativa Móvil (Chat optimizado para PC) -->
+                <div class="card mb-4 d-block d-md-none border-start border-primary border-4 animate-slide-in">
+                    <div class="card-body py-4 text-center">
+                        <i class="bi bi-display text-primary fs-1 mb-3 d-block"></i>
+                        <h5 class="fw-bold mb-2 text-main">Chat en Vivo Optimizado para PC</h5>
+                        <p class="text-muted mb-4 small">El panel de chat interactivo bidireccional, el historial detallado de mensajes del paciente y los controles de envío rápido están diseñados para pantallas de PC.</p>
+                        <a href="/dashboard" class="btn btn-primary btn-sm"><i class="bi bi-grid-1x2 me-1"></i> Volver al Dashboard</a>
+                    </div>
+                </div>
+
+                <div class="d-none d-md-block">
                 <!-- Chat layout wrapper -->
                 <div class="chat-container">
                     <!-- Left: Contacts Sidebar -->
@@ -476,6 +488,7 @@
                         </div>
                     </div>
                 </div>
+                </div> <!-- Cierre de d-none d-md-block -->
             </div>
         </div>
     </div>

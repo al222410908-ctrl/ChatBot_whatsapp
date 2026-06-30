@@ -683,3 +683,54 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
   }
 }
+
+/* ============================================================
+   SOPORTE PARA DISPOSITIVOS MÓVILES (RESPONSIVE)
+   ============================================================ */
+
+/* Capa de fondo oscura al abrir el sidebar en móviles */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.45);
+  z-index: 1040;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.sidebar-overlay.show-sidebar {
+  display: block;
+  opacity: 1;
+}
+
+@media (max-width: 767.98px) {
+  /* Forzar visualización de la barra lateral como cajón deslizable */
+  .sidebar {
+    display: flex !important; /* Sobrescribir d-none de Bootstrap */
+    position: fixed !important;
+    top: 0;
+    left: -280px; /* Fuera de pantalla por defecto */
+    width: 260px;
+    height: 100vh !important;
+    z-index: 1050;
+    transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: var(--surface-color) !important;
+    box-shadow: none;
+    border-right: 1px solid var(--border-color);
+  }
+
+  .sidebar.show-sidebar {
+    left: 0 !important;
+    box-shadow: 4px 0 25px rgba(15, 23, 42, 0.15);
+  }
+
+  /* Ajustar el padding del contenido principal en móvil */
+  .main-content {
+    padding: 15px 16px !important;
+  }
+}
+
