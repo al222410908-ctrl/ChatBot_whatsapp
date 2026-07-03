@@ -588,6 +588,7 @@ async function inicializarBD() {
   await addColumn('historial_mensajes', 'leido INTEGER DEFAULT 0');
   await addColumn('configuraciones', 'mensaje_bienvenida TEXT');
   await addColumn('configuraciones', 'mensaje_ayuda TEXT');
+  await addColumn('configuraciones', 'telefono_doctor TEXT');
 
   const defaultBienvenida = `🏥 *Chatbot de Citas Medicas*\n\nHola, soy tu asistente virtual. ¿En que puedo ayudarte?\n\n📅 *Agendar cita* - Escribe "cita" o "agendar"\n📋 *Mis citas* - Escribe "mis citas" o "consultar"\n❌ *Cancelar cita* - Escribe "cancelar"\n❓ *Ayuda* - Escribe "ayuda"\n\nEscribe una opcion para comenzar.`;
   const defaultAyuda = `❓ *Ayuda - Chatbot de Citas*\n\n📅 *Agendar cita:*\n1. Escribe "cita" o "agendar"\n2. Sigue las instrucciones paso a paso\n3. Confirma tu cita\n\n📋 *Consultar citas:*\n- Escribe "mis citas" para ver tus proximas citas\n\n❌ *Cancelar cita:*\n- Escribe "cancelar" para cancelar una cita\n\n🔄 *Reagendar cita:*\n- Cuando recibas un recordatorio, responde "3" o "reagendar"\n\n💡 *Tips:*\n- Usa fechas en formato DD/MM/YYYY\n- Responde a recordatorios con: 1 (Confirmar), 2 (Cancelar), 3 (Reagendar)`;
@@ -845,6 +846,15 @@ async function procesarConfirmacion(telefono, respuesta, estado) {
       ubicacion = `\n\n📍 *Ubicacion del Consultorio:*\n${config.direccion}\n🗺️ *Mapa:* ${config.google_maps_url}\n⚠️ *Indicaciones:* ${config.indicaciones}`;
     }
     await recordatorios.enviarMensaje(telefono, `✅ *Cita Confirmada*\n\n👤 Paciente: ${datos.nombre}\n📅 Fecha: ${datos.fechaDisplay || datos.fecha}\n⏰ Hora: ${datos.hora}\n📝 Motivo: ${datos.motivo}${ubicacion}\n\nTe enviaremos un recordatorio 24 horas antes.\n¡Gracias por agendar!`);
+    
+    // Notificar al doctor en segundo plano
+    recordatorios.notificarAlDoctor('creacion', {
+      nombre: datos.nombre,
+      telefono: telefono,
+      fecha: datos.fechaDisplay || datos.fecha,
+      hora: datos.hora,
+      motivo: datos.motivo
+    }).catch(err => console.error('Error enviando notificación al doctor:', err));
   } else if (accion === 'cancelar') {
     await limpiarEstadoConversacion(telefono);
     await recordatorios.enviarMensaje(telefono, '❌ Cita cancelada. Escribe "cita" para agendar una nueva.');
@@ -903,9 +913,28 @@ async function procesarCancelacion(telefono, respuesta, estado) {
     await recordatorios.enviarMensaje(telefono, '❌ Numero invalido. Responde con el numero de la cita a cancelar.');
     return;
   }
+  
+  const citaCancelada = await dbGet(
+    `SELECT c.fecha, c.hora, c.motivo, p.nombre as paciente_nombre
+     FROM citas c JOIN pacientes p ON c.paciente_id = p.id WHERE c.id = ?`,
+    [citaIds[idx]]
+  );
+  
   await dbRun('UPDATE citas SET estado = ? WHERE id = ?', ['cancelada', citaIds[idx]]);
   await limpiarEstadoConversacion(telefono);
   await recordatorios.enviarMensaje(telefono, '✅ Cita cancelada exitosamente. Escribe "cita" si deseas agendar una nueva.');
+  
+  if (citaCancelada) {
+    const [anio, mes, dia] = citaCancelada.fecha.split('-');
+    const fechaDisplay = `${dia}/${mes}/${anio}`;
+    recordatorios.notificarAlDoctor('cancelacion', {
+      nombre: citaCancelada.paciente_nombre,
+      telefono: telefono,
+      fecha: fechaDisplay,
+      hora: citaCancelada.hora,
+      motivo: citaCancelada.motivo
+    }).catch(err => console.error('Error enviando notificación al doctor:', err));
+  }
 }
 
 async function procesarReagendandoFecha(telefono, fecha, estado) {
@@ -982,6 +1011,15 @@ async function procesarReagendandoConfirmar(telefono, respuesta, estado) {
       ubicacion = `\n\n📍 *Ubicacion:*\n${config.direccion}\n🗺️ *Mapa:* ${config.google_maps_url}\n⚠️ *Indicaciones:* ${config.indicaciones}`;
     }
     await recordatorios.enviarMensaje(telefono, `✅ *Cita Reagendada*\n\n📅 Nueva fecha: ${datos.nuevaFechaDisplay || datos.nuevaFecha}\n⏰ Nueva hora: ${datos.nuevaHora}\n📝 Motivo: ${datos.motivo || 'Consulta general'}${ubicacion}\n\nTe enviaremos un recordatorio 24 horas antes. ¡Gracias!`);
+    
+    // Notificar al doctor en segundo plano
+    recordatorios.notificarAlDoctor('reagendamiento', {
+      nombre: datos.nombre,
+      telefono: telefono,
+      fecha: datos.nuevaFechaDisplay || datos.nuevaFecha,
+      hora: datos.nuevaHora,
+      motivo: datos.motivo
+    }).catch(err => console.error('Error enviando notificación al doctor:', err));
   } else if (accion === 'cancelar') {
     await limpiarEstadoConversacion(telefono);
     await recordatorios.enviarMensaje(telefono, '❌ Reagendamiento cancelado. Tu cita original se mantiene. Escribe "mis citas" para consultar.');
@@ -1437,16 +1475,16 @@ app.get('/configuracion', async (req, res) => {
 
 app.post('/configuracion', async (req, res) => {
   try {
-    const { dias_laborales, hora_inicio, hora_fin, duracion_cita, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda } = req.body;
+    const { dias_laborales, hora_inicio, hora_fin, duracion_cita, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor } = req.body;
     let diasStr = '[]';
     if (dias_laborales) {
       const arr = Array.isArray(dias_laborales) ? dias_laborales.map(Number) : [Number(dias_laborales)];
       diasStr = JSON.stringify(arr);
     }
     await dbRun(
-      `UPDATE configuraciones SET dias_laborales=?, hora_inicio=?, hora_fin=?, duracion_cita=?, direccion=?, google_maps_url=?, indicaciones=?, mensaje_bienvenida=?, mensaje_ayuda=?
+      `UPDATE configuraciones SET dias_laborales=?, hora_inicio=?, hora_fin=?, duracion_cita=?, direccion=?, google_maps_url=?, indicaciones=?, mensaje_bienvenida=?, mensaje_ayuda=?, telefono_doctor=?
        WHERE id = (SELECT id FROM configuraciones LIMIT 1)`,
-      [diasStr, hora_inicio, hora_fin, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda]
+      [diasStr, hora_inicio, hora_fin, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor || null]
     );
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
     res.render('configuracion', { config, success: true, message: 'Configuracion guardada correctamente.' });

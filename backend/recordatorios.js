@@ -608,6 +608,15 @@ ${config.direccion}${mapa}${indicaciones}`,
         }
 
         console.log(`✅ Cita ${citaId} CONFIRMADA por ${telefono}`);
+        
+        self.notificarAlDoctor('confirmacion', {
+          nombre: mensajePendiente.paciente_nombre,
+          telefono: telefono,
+          fecha: mensajePendiente.fecha,
+          hora: mensajePendiente.hora,
+          motivo: mensajePendiente.motivo
+        }).catch(err => console.error('Error enviando notificación al doctor:', err));
+
         return { processed: true, action: 'confirmed', citaId };
 
       } else if (accion === 'cancelar') {
@@ -631,6 +640,15 @@ Si deseas agendar una nueva cita, responde *"cita"* o *"agendar"* y te ayudaremo
         );
 
         console.log(`❌ Cita ${citaId} CANCELADA por ${telefono}`);
+        
+        self.notificarAlDoctor('cancelacion', {
+          nombre: mensajePendiente.paciente_nombre,
+          telefono: telefono,
+          fecha: mensajePendiente.fecha,
+          hora: mensajePendiente.hora,
+          motivo: mensajePendiente.motivo
+        }).catch(err => console.error('Error enviando notificación al doctor:', err));
+
         return { processed: true, action: 'cancelled', citaId };
 
       } else if (accion === 'reagendar') {
@@ -915,6 +933,56 @@ Puedes responder con el número o con tus propias palabras.`,
     }
   };
 
+  // ─── Enviar notificación al WhatsApp del doctor ─────────────
+  const notificarAlDoctor = async (tipo, info) => {
+    try {
+      const config = await new Promise((resolve) => {
+        db.get('SELECT telefono_doctor FROM configuraciones LIMIT 1', (err, row) => {
+          resolve(row);
+        });
+      });
+
+      if (!config || !config.telefono_doctor) {
+        return { success: false, error: 'No doctor phone configured' };
+      }
+
+      const telDoctor = normalizarTelefono(config.telefono_doctor);
+      if (!telDoctor) return { success: false, error: 'Invalid doctor phone' };
+
+      let mensaje = '';
+      const formattedTelPaciente = info.telefono ? normalizarTelefono(info.telefono) : '';
+
+      switch (tipo) {
+        case 'creacion':
+          mensaje = `🔔 *Nueva Cita Agendada*\n\nEl paciente *${info.nombre}* ha agendado una cita:\n\n📅 *Fecha:* ${info.fecha}\n⏰ *Hora:* ${info.hora.substring(0, 5)} hrs\n📝 *Motivo:* ${info.motivo || 'Consulta general'}\n📱 *Teléfono:* +${formattedTelPaciente}`;
+          break;
+        case 'confirmacion':
+          mensaje = `✅ *Cita Confirmada*\n\nEl paciente *${info.nombre}* ha confirmado su asistencia para su cita:\n\n📅 *Fecha:* ${info.fecha}\n⏰ *Hora:* ${info.hora.substring(0, 5)} hrs\n📝 *Motivo:* ${info.motivo || 'Consulta general'}\n📱 *Teléfono:* +${formattedTelPaciente}`;
+          break;
+        case 'cancelacion':
+          mensaje = `⚠️ *Cita Cancelada*\n\nEl paciente *${info.nombre}* ha cancelado su cita:\n\n📅 *Fecha:* ${info.fecha}\n⏰ *Hora:* ${info.hora.substring(0, 5)} hrs\n📝 *Motivo:* ${info.motivo || 'Consulta general'}\n📱 *Teléfono:* +${formattedTelPaciente}`;
+          break;
+        case 'reagendamiento':
+          mensaje = `🔄 *Cita Reagendada*\n\nEl paciente *${info.nombre}* ha reagendado su cita:\n\n📅 *Nueva Fecha:* ${info.fecha}\n⏰ *Nueva Hora:* ${info.hora.substring(0, 5)} hrs\n📝 *Motivo:* ${info.motivo || 'Consulta general'}\n📱 *Teléfono:* +${formattedTelPaciente}`;
+          break;
+        default:
+          return { success: false, error: 'Unknown notification type' };
+      }
+
+      // omitirAntiSpam = true para asegurar que el doctor reciba sus notificaciones de inmediato
+      const result = await self.enviarMensaje(telDoctor, mensaje, 'bot', true);
+      if (result.success) {
+        console.log(`✉️ [Notificación Doctor] Mensaje de tipo '${tipo}' enviado al doctor (+${telDoctor})`);
+      } else {
+        console.warn(`⚠️ [Notificación Doctor] Falló el envío al doctor (+${telDoctor}): ${result.error}`);
+      }
+      return result;
+    } catch (err) {
+      console.error('❌ Error en notificarAlDoctor:', err.message);
+      return { success: false, error: err.message };
+    }
+  };
+
   // ─── Iniciar scheduler automático ────────────────────────────
   const iniciarScheduler = (intervaloHoras = 1) => {
     console.log(`Sistema de recordatorios iniciado (24h: cada ${intervaloHoras}h | 10min: cada 5min | ventana ${HORA_INICIO_ENVIO}:00-${HORA_FIN_ENVIO}:00)`);
@@ -954,6 +1022,7 @@ Puedes responder con el número o con tus propias palabras.`,
   self.verificarYEnviarEncuestas = verificarYEnviarEncuestas;
   self.estaEnVentanaSegura = estaEnVentanaSegura;
   self.delayAleatorio = delayAleatorio;
+  self.notificarAlDoctor = notificarAlDoctor;
 
   return self;
 }

@@ -194,6 +194,19 @@
                                             <% }) %>
                                         </div>
                                     </div>
+
+                                    <div class="mt-4">
+                                        <label for="telefono_doctor" class="form-label fw-semibold">Teléfono del Médico (Notificaciones WhatsApp)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="bi bi-bell-fill text-primary"></i></span>
+                                            <input type="text" class="form-control" id="telefono_doctor" name="telefono_doctor"
+                                                value="<%= config.telefono_doctor || '' %>"
+                                                placeholder="Ej: 5215512345678 (con código de país)">
+                                        </div>
+                                        <div class="form-text mt-2">
+                                            <i class="bi bi-info-circle"></i> Recibirás avisos en tiempo real cada vez que un paciente agende, confirme o cancele una cita.
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
