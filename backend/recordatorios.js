@@ -317,17 +317,18 @@ function crearSistemaRecordatorios(db, getWaClient) {
       manana.setDate(manana.getDate() + 1);
       const fechaStr = obtenerFechaLocal(manana);
 
-      // Si es forzado, buscar citas desde MAÑANA hasta +7 dias usando fechas LOCALES
+      // Si es forzado, buscar citas desde MAÑANA hasta +2 días usando fechas LOCALES
       // IMPORTANTE: Usar parámetros JS (no date('now') de SQLite) para evitar desfase UTC/local
       // Nunca incluir HOY para no solapar con el aviso de 10min
       let queryFecha;
       let queryParams;
       if (forzar) {
         // Calcular rango usando hora local de JavaScript (no SQLite UTC)
+        // Buscamos citas de mañana (d+1) y del día siguiente (d+2), máximo 48 horas
         const d1 = new Date(); d1.setDate(d1.getDate() + 1);
-        const d7 = new Date(); d7.setDate(d7.getDate() + 7);
+        const d2 = new Date(); d2.setDate(d2.getDate() + 2);
         const fechaDesde = obtenerFechaLocal(d1);
-        const fechaHasta = obtenerFechaLocal(d7);
+        const fechaHasta = obtenerFechaLocal(d2);
         queryFecha = `c.fecha BETWEEN ? AND ?`;
         queryParams = [fechaDesde, fechaHasta];
         console.log(`[Recordatorios] MODO FORZADO: buscando citas desde ${fechaDesde} hasta ${fechaHasta}...`);
@@ -345,7 +346,7 @@ function crearSistemaRecordatorios(db, getWaClient) {
            FROM citas c
            JOIN pacientes p ON c.paciente_id = p.id
            WHERE ${queryFecha}
-           AND c.estado IN ('pendiente', 'confirmada')
+           AND c.estado IN ('pendiente', 'reagendada')
            ${condicionEnviado}`;
         db.all(sql, queryParams, (err, rows) => {
           if (err) reject(err);
@@ -755,9 +756,12 @@ Puedes responder con el número o con tus propias palabras.`,
               (err, row) => { if (err) reject(err); else resolve(row); }
             );
           });
-          if (cita && cita.estado === 'confirmada') {
+          if (cita && (cita.estado === 'pendiente' || cita.estado === 'reagendada')) {
             const exito = await enviarRecordatorio(cita);
             if (exito) reenviados++;
+          } else {
+            // Si la cita ya está confirmada o cancelada, marcar el mensaje pendiente como obsoleto
+            await actualizarEstadoMensaje(msg.id, 'obsoleto');
           }
         } else {
           const result = await self.enviarMensaje(telefonoDestino, textoMensaje, 'bot', false);
