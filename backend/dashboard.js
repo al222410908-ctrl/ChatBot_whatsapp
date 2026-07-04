@@ -3,6 +3,7 @@
 // whatsapp-web.js integrado directamente (sin Docker)
 // ============================================================
 'use strict';
+process.env.TZ = process.env.TZ || 'America/Mexico_City';
 
 const express = require('express');
 const session = require('express-session');
@@ -34,10 +35,29 @@ loadEnv('.env.local');
 loadEnv('.env');
 
 function getLocalDateString(d = new Date()) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  const timeZone = process.env.TZ || 'America/Mexico_City';
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    });
+    const parts = formatter.formatToParts(d);
+    const partsMap = {};
+    for (const part of parts) {
+      partsMap[part.type] = part.value;
+    }
+    const yyyy = partsMap.year;
+    const mm = String(partsMap.month).padStart(2, '0');
+    const dd = String(partsMap.day).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch (err) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
 }
 
 const PORT = parseInt(process.env.PORT || '3001');

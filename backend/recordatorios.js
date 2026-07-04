@@ -36,10 +36,45 @@ function delayAleatorio(minMs = DELAY_MIN_MS, maxMs = DELAY_MAX_MS) {
 
 // ─── Verificar ventana horaria segura ───────────────────────────
 function estaEnVentanaSegura() {
-  const ahora = new Date();
-  const diaSemana = ahora.getDay();
-  const hora = ahora.getHours();
-  const min = ahora.getMinutes();
+  const timeZone = process.env.TZ || 'America/Mexico_City';
+  let ahoraLocal;
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(new Date());
+    const partsMap = {};
+    for (const part of parts) {
+      partsMap[part.type] = part.value;
+    }
+    const year = parseInt(partsMap.year);
+    const month = parseInt(partsMap.month) - 1;
+    const day = parseInt(partsMap.day);
+    const hour = parseInt(partsMap.hour);
+    const min = parseInt(partsMap.minute);
+
+    const localDate = new Date(year, month, day, hour, min);
+    ahoraLocal = {
+      diaSemana: localDate.getDay(),
+      hora,
+      min
+    };
+  } catch (err) {
+    const ahora = new Date();
+    ahoraLocal = {
+      diaSemana: ahora.getDay(),
+      hora: ahora.getHours(),
+      min: ahora.getMinutes()
+    };
+  }
+
+  const { diaSemana, hora, min } = ahoraLocal;
 
   const config = cachedConfig;
   if (!config) {
@@ -168,10 +203,29 @@ function normalizarTelefono(telefono) {
 }
 
 function obtenerFechaLocal(d = new Date()) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  const timeZone = process.env.TZ || 'America/Mexico_City';
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    });
+    const parts = formatter.formatToParts(d);
+    const partsMap = {};
+    for (const part of parts) {
+      partsMap[part.type] = part.value;
+    }
+    const yyyy = partsMap.year;
+    const mm = String(partsMap.month).padStart(2, '0');
+    const dd = String(partsMap.day).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch (err) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
 }
 
 /**
