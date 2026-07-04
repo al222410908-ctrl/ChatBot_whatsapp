@@ -271,6 +271,19 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="row text-start mt-3">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="max_mensajes_dia" class="form-label fw-semibold">Límite Diario de Mensajes por Paciente</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text"><i class="bi bi-chat-left-dots-fill text-primary"></i></span>
+                                                <input type="number" class="form-control" id="max_mensajes_dia" name="max_mensajes_dia"
+                                                    value="<%= config.max_mensajes_dia !== undefined ? config.max_mensajes_dia : 15 %>" min="1" max="500" required>
+                                            </div>
+                                            <div class="form-text mt-2">
+                                                <i class="bi bi-info-circle"></i> Número máximo de mensajes que el chatbot/recordatorios enviará a un paciente por día (evita spam y bloqueos de WhatsApp).
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

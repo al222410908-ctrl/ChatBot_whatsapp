@@ -530,7 +530,8 @@ async function inicializarBD() {
     duracion_cita INTEGER,
     direccion TEXT,
     google_maps_url TEXT,
-    indicaciones TEXT
+    indicaciones TEXT,
+    max_mensajes_dia INTEGER DEFAULT 15
   )`);
 
   await run(`CREATE TABLE IF NOT EXISTS historial_mensajes (
@@ -589,6 +590,7 @@ async function inicializarBD() {
   await addColumn('configuraciones', 'mensaje_bienvenida TEXT');
   await addColumn('configuraciones', 'mensaje_ayuda TEXT');
   await addColumn('configuraciones', 'telefono_doctor TEXT');
+  await addColumn('configuraciones', 'max_mensajes_dia INTEGER DEFAULT 15');
 
   const defaultBienvenida = `🏥 *Chatbot de Citas Medicas*\n\nHola, soy tu asistente virtual. ¿En que puedo ayudarte?\n\n📅 *Agendar cita* - Escribe "cita" o "agendar"\n📋 *Mis citas* - Escribe "mis citas" o "consultar"\n❌ *Cancelar cita* - Escribe "cancelar"\n❓ *Ayuda* - Escribe "ayuda"\n\nEscribe una opcion para comenzar.`;
   const defaultAyuda = `❓ *Ayuda - Chatbot de Citas*\n\n📅 *Agendar cita:*\n1. Escribe "cita" o "agendar"\n2. Sigue las instrucciones paso a paso\n3. Confirma tu cita\n\n📋 *Consultar citas:*\n- Escribe "mis citas" para ver tus proximas citas\n\n❌ *Cancelar cita:*\n- Escribe "cancelar" para cancelar una cita\n\n🔄 *Reagendar cita:*\n- Cuando recibas un recordatorio, responde "3" o "reagendar"\n\n💡 *Tips:*\n- Usa fechas en formato DD/MM/YYYY\n- Responde a recordatorios con: 1 (Confirmar), 2 (Cancelar), 3 (Reagendar)`;
@@ -1475,16 +1477,16 @@ app.get('/configuracion', async (req, res) => {
 
 app.post('/configuracion', async (req, res) => {
   try {
-    const { dias_laborales, hora_inicio, hora_fin, duracion_cita, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor } = req.body;
+    const { dias_laborales, hora_inicio, hora_fin, duracion_cita, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor, max_mensajes_dia } = req.body;
     let diasStr = '[]';
     if (dias_laborales) {
       const arr = Array.isArray(dias_laborales) ? dias_laborales.map(Number) : [Number(dias_laborales)];
       diasStr = JSON.stringify(arr);
     }
     await dbRun(
-      `UPDATE configuraciones SET dias_laborales=?, hora_inicio=?, hora_fin=?, duracion_cita=?, direccion=?, google_maps_url=?, indicaciones=?, mensaje_bienvenida=?, mensaje_ayuda=?, telefono_doctor=?
+      `UPDATE configuraciones SET dias_laborales=?, hora_inicio=?, hora_fin=?, duracion_cita=?, direccion=?, google_maps_url=?, indicaciones=?, mensaje_bienvenida=?, mensaje_ayuda=?, telefono_doctor=?, max_mensajes_dia=?
        WHERE id = (SELECT id FROM configuraciones LIMIT 1)`,
-      [diasStr, hora_inicio, hora_fin, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor || null]
+      [diasStr, hora_inicio, hora_fin, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor || null, parseInt(max_mensajes_dia) || 15]
     );
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
     res.render('configuracion', { config, success: true, message: 'Configuracion guardada correctamente.' });

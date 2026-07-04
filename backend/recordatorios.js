@@ -26,13 +26,13 @@ function estaEnVentanaSegura() {
 }
 
 // ─── Verificar y registrar límite diario por número ─────────────
-function verificarLimiteDiario(telefono) {
+function verificarLimiteDiario(telefono, maxLimit = MAX_MENSAJES_POR_NUMERO_DIA) {
   // Resetear contadores a medianoche
   const hoyKey = new Date().toISOString().split('T')[0];
   const key = `${hoyKey}:${telefono}`;
   const conteo = contadorMensajesDia.get(key) || 0;
-  if (conteo >= MAX_MENSAJES_POR_NUMERO_DIA) {
-    console.warn(`⚠️ [ANTI-SPAM] Límite diario alcanzado para ${telefono} (${conteo} mensajes hoy)`);
+  if (conteo >= maxLimit) {
+    console.warn(`⚠️ [ANTI-SPAM] Límite diario alcanzado para ${telefono} (${conteo} mensajes hoy, límite: ${maxLimit})`);
     return false;
   }
   contadorMensajesDia.set(key, conteo + 1);
@@ -152,8 +152,15 @@ function crearSistemaRecordatorios(db, getWaClient) {
         }
 
         // 2. Límite diario por número
-        if (!verificarLimiteDiario(telFormateado)) {
-          return { success: false, error: `Límite diario de ${MAX_MENSAJES_POR_NUMERO_DIA} mensajes alcanzado para este número` };
+        const config = await new Promise((resolve) => {
+          db.get('SELECT max_mensajes_dia FROM configuraciones LIMIT 1', (err, row) => {
+            resolve(row);
+          });
+        });
+        const maxLimit = config && config.max_mensajes_dia !== undefined && config.max_mensajes_dia !== null ? config.max_mensajes_dia : 15;
+
+        if (!verificarLimiteDiario(telFormateado, maxLimit)) {
+          return { success: false, error: `Límite diario de ${maxLimit} mensajes alcanzado para este número` };
         }
 
         // 3. Delay aleatorio anti-spam
