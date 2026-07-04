@@ -1488,6 +1488,7 @@ app.post('/configuracion', async (req, res) => {
        WHERE id = (SELECT id FROM configuraciones LIMIT 1)`,
       [diasStr, hora_inicio, hora_fin, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor || null, parseInt(max_mensajes_dia) || 15]
     );
+    await recordatorios.actualizarCacheConfig();
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
     res.render('configuracion', { config, success: true, message: 'Configuracion guardada correctamente.' });
   } catch (error) { res.status(500).send('Error guardando configuracion'); }

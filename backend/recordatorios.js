@@ -13,6 +13,21 @@ const DELAY_MAX_MS = 5000;     // Espera máxima entre mensajes: 5s
 // Se reinicia al reiniciar el proceso (suficiente para uso diario en laptop)
 const contadorMensajesDia = new Map();
 
+let moduleDb = null;
+let cachedConfig = null;
+
+async function actualizarCacheConfig() {
+  if (!moduleDb) return;
+  return new Promise((resolve) => {
+    moduleDb.get('SELECT * FROM configuraciones LIMIT 1', (err, row) => {
+      if (!err && row) {
+        cachedConfig = row;
+      }
+      resolve();
+    });
+  });
+}
+
 // ─── Delay aleatorio anti-spam ───────────────────────────────────
 function delayAleatorio(minMs = DELAY_MIN_MS, maxMs = DELAY_MAX_MS) {
   const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
@@ -21,8 +36,42 @@ function delayAleatorio(minMs = DELAY_MIN_MS, maxMs = DELAY_MAX_MS) {
 
 // ─── Verificar ventana horaria segura ───────────────────────────
 function estaEnVentanaSegura() {
-  const hora = new Date().getHours();
-  return hora >= HORA_INICIO_ENVIO && hora < HORA_FIN_ENVIO;
+  const ahora = new Date();
+  const diaSemana = ahora.getDay();
+  const hora = ahora.getHours();
+  const min = ahora.getMinutes();
+
+  const config = cachedConfig;
+  if (!config) {
+    return hora >= HORA_INICIO_ENVIO && hora < HORA_FIN_ENVIO;
+  }
+
+  // 1. Verificar si hoy es un día laboral
+  let diasLaborales = [];
+  try {
+    diasLaborales = JSON.parse(config.dias_laborales || '[]');
+    if (Array.isArray(diasLaborales)) {
+      diasLaborales = diasLaborales.map(Number);
+    }
+  } catch (e) {
+    diasLaborales = [1, 2, 3, 4, 5];
+  }
+  if (!diasLaborales.includes(diaSemana)) {
+    return false; // Hoy no se trabaja, envíos pausados
+  }
+
+  // 2. Verificar si estamos dentro del horario de atención
+  const horaInicio = config.hora_inicio || '08:00';
+  const horaFin = config.hora_fin || '21:00';
+
+  const [hIni, mIni] = horaInicio.split(':').map(Number);
+  const [hFin, mFin] = horaFin.split(':').map(Number);
+
+  const minutosAhora = hora * 60 + min;
+  const minutosInicio = hIni * 60 + mIni;
+  const minutosFin = hFin * 60 + mFin;
+
+  return minutosAhora >= minutosInicio && minutosAhora < minutosFin;
 }
 
 // ─── Verificar y registrar límite diario por número ─────────────
@@ -131,6 +180,8 @@ function obtenerFechaLocal(d = new Date()) {
  */
 function crearSistemaRecordatorios(db, getWaClient) {
   const self = {};
+  moduleDb = db;
+  actualizarCacheConfig();
 
   // ─── Envío de mensaje WhatsApp via cliente local ──────────────
   self.enviarMensaje = async (telefono, texto, remitente = 'bot', omitirAntiSpam = false) => {
@@ -1035,6 +1086,7 @@ Puedes responder con el número o con tus propias palabras.`,
   self.obtenerProximosDiasDisponibles = obtenerProximosDiasDisponibles;
   self.verificarYEnviarEncuestas = verificarYEnviarEncuestas;
   self.estaEnVentanaSegura = estaEnVentanaSegura;
+  self.actualizarCacheConfig = actualizarCacheConfig;
   self.delayAleatorio = delayAleatorio;
   self.notificarAlDoctor = notificarAlDoctor;
 
