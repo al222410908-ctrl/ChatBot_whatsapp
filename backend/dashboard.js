@@ -715,7 +715,7 @@ async function iniciarAgendamiento(telefono) {
     db.get('SELECT nombre FROM pacientes WHERE telefono = ?', [telefono], (err, row) => resolve(row));
   });
 
-  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(5);
+  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(7);
 
   if (paciente && paciente.nombre) {
     const nombre = paciente.nombre.trim();
@@ -723,7 +723,7 @@ async function iniciarAgendamiento(telefono) {
     await guardarEstadoConversacion(telefono, 'esperando_fecha', datos);
 
     let msg = `📅 *Agendar Nueva Cita*\n\nHola *${nombre}*, gusto en saludarte nuevamente. 😊\n\n¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 17/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
-    const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
+    const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
     diasDisponibles.forEach((dia, idx) => {
       const emoji = emojis[idx] || `${idx + 1}.`;
       msg += `${emoji} *${dia.diaNombre} ${dia.fechaDisplay}* (${dia.slotsCount} horarios)\n`;
@@ -743,12 +743,12 @@ async function procesarNombre(telefono, nombre, estado) {
   const datos = JSON.parse(estado.datos || '{}');
   datos.nombre = nombre;
   
-  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(5);
+  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(7);
   datos.fechasSugeridas = diasDisponibles.map(d => d.fechaISO);
   await guardarEstadoConversacion(telefono, 'esperando_fecha', datos);
 
   let msg = `✅ Nombre: *${nombre}*\n\n📅 ¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 17/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
-  const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
+  const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
   diasDisponibles.forEach((dia, idx) => {
     const emoji = emojis[idx] || `${idx + 1}.`;
     msg += `${emoji} *${dia.diaNombre} ${dia.fechaDisplay}* (${dia.slotsCount} horarios)\n`;

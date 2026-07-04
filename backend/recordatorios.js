@@ -660,7 +660,7 @@ Si deseas agendar una nueva cita, responde *"cita"* o *"agendar"* y te ayudaremo
         return { processed: true, action: 'cancelled', citaId };
 
       } else if (accion === 'reagendar') {
-        const diasDisponibles = await obtenerProximosDiasDisponibles(5);
+        const diasDisponibles = await obtenerProximosDiasDisponibles(7);
         await new Promise((resolve, reject) => {
           db.run(
             `INSERT OR REPLACE INTO conversaciones (telefono, estado, datos, actualizado_en)
@@ -676,7 +676,7 @@ Si deseas agendar una nueva cita, responde *"cita"* o *"agendar"* y te ayudaremo
         });
 
         let msg = `🔄 *Reagendar Cita*\n\nHola ${mensajePendiente.paciente_nombre.trim()}, vamos a agendar una nueva cita para reemplazar la del ${mensajePendiente.fecha} a las ${mensajePendiente.hora.substring(0, 5)}.\n\n📅 ¿Para qué fecha deseas tu nueva cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 20/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
-        const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
+        const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
         diasDisponibles.forEach((dia, idx) => {
           const emoji = emojis[idx] || `${idx + 1}.`;
           msg += `${emoji} *${dia.diaNombre} ${dia.fechaDisplay}* (${dia.slotsCount} horarios)\n`;
@@ -798,6 +798,9 @@ Puedes responder con el número o con tus propias palabras.`,
     let diasLaborales = [];
     try {
       diasLaborales = JSON.parse(config.dias_laborales || '[]');
+      if (Array.isArray(diasLaborales)) {
+        diasLaborales = diasLaborales.map(Number);
+      }
     } catch (e) {
       diasLaborales = [1, 2, 3, 4, 5];
     }
