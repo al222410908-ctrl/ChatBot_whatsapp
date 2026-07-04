@@ -82,26 +82,16 @@
                         <h2>Gestión de Pacientes</h2>
                         <p>Directorio de pacientes registrados en el sistema del consultorio</p>
                     </div>
-                    <a href="/pacientes/nuevo" class="btn btn-primary d-none d-md-inline-block">
-                        <i class="bi bi-person-plus me-1"></i> Registrar Paciente
+                    <a href="/pacientes/nuevo" class="btn btn-primary">
+                        <i class="bi bi-person-plus me-1"></i> <span class="d-none d-sm-inline">Registrar Paciente</span><span class="d-inline d-sm-none">Registrar</span>
                     </a>
                 </div>
 
-                <!-- Tarjeta Informativa Móvil (Pacientes optimizados para PC) -->
-                <div class="card mb-4 d-block d-md-none border-start border-primary border-4 animate-slide-in">
-                    <div class="card-body py-4 text-center">
-                        <i class="bi bi-display text-primary fs-1 mb-3 d-block"></i>
-                        <h5 class="fw-bold mb-2 text-main">Directorio de Pacientes Optimizado para PC</h5>
-                        <p class="text-muted mb-4 small">El listado completo de pacientes registrados, el historial de consultas y las opciones de edición están diseñados para su visualización en pantallas de PC.</p>
-                        <a href="/dashboard" class="btn btn-primary btn-sm"><i class="bi bi-grid-1x2 me-1"></i> Volver al Dashboard</a>
-                    </div>
-                </div>
-
-                <div class="d-none d-md-block">
                 <div class="card">
                     <div class="card-body p-0">
                         <% if (pacientes.length > 0) { %>
-                            <div class="table-responsive">
+                            <!-- Vista Desktop (Tabla) -->
+                            <div class="table-responsive d-none d-md-block">
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
@@ -121,7 +111,7 @@
                                                 <td><%= new Date(paciente.creado_en).toLocaleDateString('es-ES') %></td>
                                                 <td class="text-end">
                                                     <div class="d-inline-flex gap-2">
-                                                        <a href="/chat" class="btn btn-sm btn-outline-success" title="Chat en Vivo">
+                                                        <a href="/chat?phone=<%= paciente.telefono %>" class="btn btn-sm btn-outline-success" title="Chat en Vivo">
                                                             <i class="bi bi-chat-fill"></i>
                                                         </a>
                                                         <a href="/pacientes/<%= paciente.id %>/editar" class="btn btn-sm btn-outline-primary" title="Editar">
@@ -134,6 +124,37 @@
                                     </tbody>
                                 </table>
                             </div>
+
+                            <!-- Vista Móvil (Tarjetas) -->
+                            <div class="d-block d-md-none p-3">
+                                <% pacientes.forEach(paciente => { %>
+                                    <div class="card mb-3 p-3 border-start border-primary border-3" style="border-radius: 8px;">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div>
+                                                <span class="text-muted small">#<%= paciente.id %></span>
+                                                <h6 class="fw-bold text-main mb-1" style="font-size: 0.95rem;"><%= paciente.nombre %></h6>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <a href="/chat?phone=<%= paciente.telefono %>" class="btn btn-sm btn-outline-success px-2 py-1" style="border-radius: 6px;" title="Chat en Vivo">
+                                                    <i class="bi bi-chat-fill"></i>
+                                                </a>
+                                                <a href="/pacientes/<%= paciente.id %>/editar" class="btn btn-sm btn-outline-primary px-2 py-1" style="border-radius: 6px;" title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-light">
+                                            <div class="small">
+                                                <i class="bi bi-whatsapp text-success me-1"></i>
+                                                <span class="text-main fw-semibold"><%= paciente.telefono %></span>
+                                            </div>
+                                            <div class="text-muted small">
+                                                <i class="bi bi-calendar3 me-1"></i><%= new Date(paciente.creado_en).toLocaleDateString('es-ES') %>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <% }); %>
+                            </div>
                         <% } else { %>
                             <div class="text-center py-5 text-muted">
                                 <i class="bi bi-people fs-1 opacity-50"></i>
@@ -143,8 +164,8 @@
                                 </a>
                             </div>
                         <% } %>
+                    </div>
                 </div>
-                </div> <!-- Cierre de d-none d-md-block -->
             </div>
         </div>
     </div>

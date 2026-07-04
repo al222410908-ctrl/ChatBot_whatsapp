@@ -189,6 +189,25 @@
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: .5; transform: scale(1.3); }
         }
+
+        /* Ajustes FullCalendar y Layout en Móviles */
+        @media (max-width: 767.98px) {
+            #calendar {
+                padding: 8px;
+            }
+            .fc-toolbar-title {
+                font-size: 1rem !important;
+            }
+            .fc .fc-button-primary {
+                padding: 4px 8px !important;
+                font-size: 0.75rem !important;
+            }
+            .fc-header-toolbar {
+                flex-direction: column;
+                gap: 8px;
+                align-items: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -242,24 +261,14 @@
                         <h2 class="fw-bold mb-1">Gestión de Citas</h2>
                         <p class="text-muted mb-0">Listado y calendario de todas las consultas médicas</p>
                     </div>
-                    <div class="d-inline-flex gap-2 d-none d-md-inline-flex">
-                        <a href="/api/citas/exportar-csv" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar CSV</a>
-                        <a href="/citas/nueva" class="btn btn-primary text-white"><i class="bi bi-calendar-plus me-1"></i> Nueva Cita</a>
+                    <div class="d-inline-flex gap-2">
+                        <a href="/api/citas/exportar-csv" class="btn btn-outline-success d-none d-md-inline-flex"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar CSV</a>
+                        <a href="/citas/nueva" class="btn btn-primary text-white"><i class="bi bi-calendar-plus me-1"></i> <span class="d-none d-sm-inline">Nueva Cita</span><span class="d-inline d-sm-none">Nueva</span></a>
                     </div>
                 </div>
 
-                <!-- Tarjeta Informativa Móvil (Citas optimizadas para PC) -->
-                <div class="card mb-4 d-block d-md-none border-start border-primary border-4 animate-slide-in">
-                    <div class="card-body py-4 text-center">
-                        <i class="bi bi-display text-primary fs-1 mb-3 d-block"></i>
-                        <h5 class="fw-bold mb-2 text-main">Agenda y Calendario Optimizado para PC</h5>
-                        <p class="text-muted mb-4 small">El listado completo de citas, la exportación de planillas CSV y el calendario visual interactivo están diseñados para pantallas de ordenadores de escritorio.</p>
-                        <a href="/dashboard" class="btn btn-primary btn-sm"><i class="bi bi-grid-1x2 me-1"></i> Volver al Dashboard</a>
-                    </div>
-                </div>
-
-                <!-- Tabs header & content (ocultos en móvil) -->
-                <div class="d-none d-md-block">
+                <!-- Tabs header & content -->
+                <div>
                     <ul class="nav nav-pills mb-4" id="citasTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="listado-tab" data-bs-toggle="tab" data-bs-target="#listado-tab-pane" type="button" role="tab"><i class="bi bi-list-task me-1"></i> Listado de Citas</button>
@@ -310,7 +319,8 @@
                         <div class="card">
                             <div class="card-body p-0">
                                 <% if (citas.length > 0) { %>
-                                    <div class="table-responsive">
+                                    <!-- Vista Desktop (Tabla) -->
+                                    <div class="table-responsive d-none d-md-block">
                                         <table class="table table-hover">
                                             <thead>
                                                 <tr>
@@ -382,6 +392,75 @@
                                             </tbody>
                                         </table>
                                     </div>
+
+                                    <!-- Vista Móvil (Tarjetas) -->
+                                    <div class="d-block d-md-none p-3">
+                                        <% citas.forEach(cita => { %>
+                                            <% 
+                                                let borderClass = 'border-warning'; // pendiente
+                                                let badgeClass = 'bg-warning text-dark';
+                                                let statusText = 'Pendiente';
+                                                if (cita.estado === 'confirmada') { 
+                                                    borderClass = 'border-success'; 
+                                                    badgeClass = 'bg-success';
+                                                    statusText = 'Confirmada';
+                                                } else if (cita.estado === 'cancelada') { 
+                                                    borderClass = 'border-danger'; 
+                                                    badgeClass = 'bg-danger';
+                                                    statusText = 'Cancelada';
+                                                } else if (cita.estado === 'reagendada') { 
+                                                    borderClass = 'border-info'; 
+                                                    badgeClass = 'bg-info text-dark';
+                                                    statusText = 'Reagendada';
+                                                }
+                                            %>
+                                            <div class="card mb-3 p-3 border-start border-4 <%= borderClass %>" style="border-radius: 8px;">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="text-muted small">#<%= cita.id %></span>
+                                                        <h6 class="fw-bold text-main mb-1" style="font-size: 0.95rem;"><%= cita.paciente_nombre %></h6>
+                                                    </div>
+                                                    <span class="badge <%= badgeClass %>"><%= statusText %></span>
+                                                </div>
+                                                
+                                                <div class="my-2 small text-muted">
+                                                    <div class="mb-1"><i class="bi bi-calendar-event me-2 text-primary"></i><strong>Fecha:</strong> <%= new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-ES') %></div>
+                                                    <div class="mb-1"><i class="bi bi-clock me-2 text-primary"></i><strong>Hora:</strong> <span class="fw-semibold text-primary"><%= cita.hora.substring(0, 5) %></span></div>
+                                                    <% if (cita.motivo) { %>
+                                                        <div class="mb-1"><i class="bi bi-clipboard2-pulse me-2"></i><strong>Motivo:</strong> <%= cita.motivo %></div>
+                                                    <% } %>
+                                                    <% if (cita.notas) { %>
+                                                        <div class="mb-1 text-truncate" title="<%= cita.notas %>"><i class="bi text-muted bi-chat-left-text me-2"></i><strong>Notas:</strong> <%= cita.notas %></div>
+                                                    <% } %>
+                                                    <% if (cita.calificacion) { %>
+                                                        <div class="mb-1"><i class="bi bi-star-fill text-warning me-2"></i><strong>Calificación:</strong> 
+                                                            <span class="text-warning fw-semibold">
+                                                                <% for(let i=0; i<cita.calificacion; i++) { %>★<% } %>
+                                                                <span class="text-muted small">(<%= cita.calificacion %>)</span>
+                                                            </span>
+                                                        </div>
+                                                    <% } %>
+                                                </div>
+
+                                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-light">
+                                                    <div class="small">
+                                                        <i class="bi bi-whatsapp text-success me-1"></i>
+                                                        <a href="/chat?phone=<%= cita.paciente_telefono %>" class="text-decoration-none text-main fw-semibold"><%= cita.paciente_telefono %></a>
+                                                    </div>
+                                                    <div class="d-flex gap-2">
+                                                        <a href="/citas/<%= cita.id %>/editar" class="btn btn-sm btn-outline-primary px-2 py-1" style="border-radius: 6px;" title="Editar">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </a>
+                                                        <form action="/citas/<%= cita.id %>/eliminar" method="POST" style="display: inline;" onsubmit="return confirm('¿Estás seguro de eliminar esta cita?')">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-1" style="border-radius: 6px;" title="Eliminar">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <% }); %>
+                                    </div>
                                 <% } else { %>
                                     <div class="text-center py-5 text-muted">
                                         <i class="bi bi-calendar-x fs-1 opacity-50"></i>
@@ -400,7 +479,6 @@
                         </div>
                     </div>
                 </div>
-                </div> <!-- Cierre de d-none d-md-block -->
             </div>
         </div>
     </div>
