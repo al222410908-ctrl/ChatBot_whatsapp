@@ -653,10 +653,11 @@ Hola ${cita.paciente_nombre}, te recordamos que tu cita de hoy a las *${cita.hor
     try {
       const mensajePendiente = await new Promise((resolve, reject) => {
         db.get(
-          `SELECT mp.*, c.id as cita_id, c.fecha, c.hora, c.motivo, p.nombre as paciente_nombre
+          `SELECT mp.*, c.id as cita_id, c.fecha, c.hora, c.motivo, p.nombre as paciente_nombre, c.servicio_id, COALESCE(s.duracion, 60) as duracion, s.nombre as servicio_nombre
            FROM mensajes_pendientes mp
            JOIN citas c ON mp.cita_id = c.id
            JOIN pacientes p ON c.paciente_id = p.id
+           LEFT JOIN servicios s ON c.servicio_id = s.id
            WHERE mp.tipo = 'recordatorio'
            AND mp.estado IN ('enviado', 'pendiente')
            AND p.telefono = ?
@@ -765,7 +766,8 @@ Si deseas agendar una nueva cita, responde *"cita"* o *"agendar"* y te ayudaremo
         return { processed: true, action: 'cancelled', citaId };
 
       } else if (accion === 'reagendar') {
-        const diasDisponibles = await obtenerProximosDiasDisponibles(7);
+        const duracionOriginal = mensajePendiente.duracion || 60;
+        const diasDisponibles = await obtenerProximosDiasDisponibles(7, duracionOriginal);
         await new Promise((resolve, reject) => {
           db.run(
             `INSERT OR REPLACE INTO conversaciones (telefono, estado, datos, actualizado_en)
@@ -774,13 +776,15 @@ Si deseas agendar una nueva cita, responde *"cita"* o *"agendar"* y te ayudaremo
               citaOriginalId: citaId,
               nombre: mensajePendiente.paciente_nombre,
               motivo: mensajePendiente.motivo,
+              servicioId: mensajePendiente.servicio_id,
+              duracion: duracionOriginal,
               fechasSugeridas: diasDisponibles.map(d => d.fechaISO)
             })],
             (err) => { if (err) reject(err); else resolve(); }
           );
         });
 
-        let msg = `🔄 *Reagendar Cita*\n\nHola ${mensajePendiente.paciente_nombre.trim()}, vamos a agendar una nueva cita para reemplazar la del ${mensajePendiente.fecha} a las ${mensajePendiente.hora.substring(0, 5)}.\n\n📅 ¿Para qué fecha deseas tu nueva cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 20/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
+        let msg = `🔄 *Reagendar Cita*\n\nHola ${mensajePendiente.paciente_nombre.trim()}, vamos a agendar una nueva cita para reemplazar la del ${mensajePendiente.fecha} a las ${mensajePendiente.hora.substring(0, 5)}.\n\n📅 ¿Para qué fecha deseas tu nueva cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 20/06/2026), di algo como *"mañana"* o *"el lunes"*, o responde con el *número* de una opción sugerida:\n\n`;
         const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
         diasDisponibles.forEach((dia, idx) => {
           const emoji = emojis[idx] || `${idx + 1}.`;
@@ -889,7 +893,7 @@ Puedes responder con el número o con tus propias palabras.`,
   };
 
   // ─── Obtener horarios disponibles para una fecha ─────────────
-  const obtenerHorariosDisponibles = async (fecha) => {
+  const obtenerHorariosDisponibles = async (fecha, duracionCitaOverride = null) => {
     const config = await new Promise((resolve, reject) => {
       db.get('SELECT * FROM configuraciones LIMIT 1', (err, row) => {
         if (err) reject(err);
@@ -911,28 +915,92 @@ Puedes responder con el número o con tus propias palabras.`,
     }
     if (!diasLaborales.includes(diaSemana)) return [];
 
-    const citas = await new Promise((resolve, reject) => {
+    // Consultar bloqueos de la agenda
+    const bloqueos = await new Promise((resolve, reject) => {
       db.all(
-        `SELECT hora FROM citas WHERE fecha = ? AND estado NOT IN ('cancelada', 'reagendada')`,
+        `SELECT * FROM bloqueos_agenda WHERE fecha = ?`,
         [fecha],
-        (err, rows) => { if (err) reject(err); else resolve(rows); }
+        (err, rows) => { if (err) reject(err); else resolve(rows || []); }
       );
     });
-    const horasOcupadas = citas.map(c => c.hora.substring(0, 5));
+
+    const bloqueoDiaCompleto = bloqueos.find(b => !b.hora_inicio && !b.hora_fin);
+    if (bloqueoDiaCompleto) return [];
+
+    // Consultar citas agendadas con su duración de servicio real
+    const citas = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT c.hora, COALESCE(s.duracion, 60) as duracion
+         FROM citas c
+         LEFT JOIN servicios s ON c.servicio_id = s.id
+         WHERE c.fecha = ? AND c.estado NOT IN ('cancelada', 'reagendada')`,
+        [fecha],
+        (err, rows) => { if (err) reject(err); else resolve(rows || []); }
+      );
+    });
+
+    const parseTime = (timeStr) => {
+      const [h, m] = timeStr.split(':').map(Number);
+      return new Date(2020, 0, 1, h, m);
+    };
+
+    const ocupados = [];
+    // 1. Añadir citas
+    for (const c of citas) {
+      const start = parseTime(c.hora.substring(0, 5));
+      const end = new Date(start.getTime() + c.duracion * 60 * 1000);
+      ocupados.push({ start, end });
+    }
+    // 2. Añadir bloqueos de rango de horas
+    for (const b of bloqueos) {
+      if (b.hora_inicio && b.hora_fin) {
+        const start = parseTime(b.hora_inicio);
+        const end = parseTime(b.hora_fin);
+        ocupados.push({ start, end });
+      }
+    }
 
     const slots = [];
     let [hInicio, mInicio] = config.hora_inicio.split(':').map(Number);
     const [hFin, mFin] = config.hora_fin.split(':').map(Number);
-    const duracion = config.duracion_cita || 60;
+    const duracion = duracionCitaOverride !== null ? Number(duracionCitaOverride) : (config.duracion_cita || 60);
 
     let actual = new Date(2020, 0, 1, hInicio, mInicio);
     const limite = new Date(2020, 0, 1, hFin, mFin);
 
+    let recesoStart = null;
+    let recesoEnd = null;
+    if (config.receso_inicio && config.receso_fin) {
+      const [rhIn, rmIn] = config.receso_inicio.split(':').map(Number);
+      const [rhFin, rmFin] = config.receso_fin.split(':').map(Number);
+      recesoStart = new Date(2020, 0, 1, rhIn, rmIn);
+      recesoEnd = new Date(2020, 0, 1, rhFin, rmFin);
+    }
+
     while (actual < limite) {
+      const slotStart = new Date(actual.getTime());
+      const slotEnd = new Date(actual.getTime() + duracion * 60 * 1000);
+
+      let enReceso = false;
+      if (recesoStart && recesoEnd) {
+        if (slotStart < recesoEnd && slotEnd > recesoStart) {
+          enReceso = true;
+        }
+      }
+
+      let colisiona = false;
+      for (const o of ocupados) {
+        if (slotStart < o.end && slotEnd > o.start) {
+          colisiona = true;
+          break;
+        }
+      }
+
       const hh = String(actual.getHours()).padStart(2, '0');
       const mm = String(actual.getMinutes()).padStart(2, '0');
       const horaStr = `${hh}:${mm}`;
-      if (!horasOcupadas.includes(horaStr)) {
+
+      if (!enReceso && !colisiona) {
         slots.push(horaStr);
       }
       actual.setMinutes(actual.getMinutes() + duracion);
@@ -949,7 +1017,7 @@ Puedes responder con el número o con tus propias palabras.`,
   };
 
   // ─── Obtener los próximos días disponibles con slots ─────────
-  const obtenerProximosDiasDisponibles = async (cantidad = 5) => {
+  const obtenerProximosDiasDisponibles = async (cantidad = 5, duracionCitaOverride = null) => {
     const dias = [];
     const hoy = new Date();
     // Revisar próximos 14 días para encontrar días con slots disponibles

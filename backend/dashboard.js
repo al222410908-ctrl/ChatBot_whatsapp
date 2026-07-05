@@ -60,6 +60,214 @@ function getLocalDateString(d = new Date()) {
   }
 }
 
+function buscarFechaEnTexto(texto, diasSugeridos) {
+  if (!texto) return null;
+  const textoLimpio = texto.toLowerCase().trim()
+    .replace(/á/g, 'a')
+    .replace(/é/g, 'e')
+    .replace(/í/g, 'i')
+    .replace(/ó/g, 'o')
+    .replace(/ú/g, 'u');
+
+  // 1. Ver si es un número de opción directo (ej: "1", "opción 2", "la 3")
+  const matchOpcion = textoLimpio.match(/^\s*(?:(?:la\s+)?opcion\s+)?(\d+)\s*$/);
+  if (matchOpcion) {
+    const idx = parseInt(matchOpcion[1]) - 1;
+    if (idx >= 0 && idx < diasSugeridos.length) {
+      return diasSugeridos[idx];
+    }
+  }
+
+  // Helper para obtener fecha local en formato YYYY-MM-DD
+  const getLocalISOString = (d) => {
+    const timeZone = process.env.TZ || 'America/Mexico_City';
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+      });
+      const parts = formatter.formatToParts(d);
+      const partsMap = {};
+      for (const part of parts) {
+        partsMap[part.type] = part.value;
+      }
+      const yyyy = partsMap.year;
+      const mm = String(partsMap.month).padStart(2, '0');
+      const dd = String(partsMap.day).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    } catch (err) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  };
+
+  // 2. Palabras clave relativas: "hoy", "mañana"
+  if (textoLimpio.includes('hoy')) {
+    const hoyISO = getLocalISOString(new Date());
+    const hoyObj = diasSugeridos.find(d => d.fechaISO === hoyISO);
+    if (hoyObj) return hoyObj;
+  }
+  
+  if (textoLimpio.includes('manana')) {
+    const mananaISO = getLocalISOString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const mananaObj = diasSugeridos.find(d => d.fechaISO === mananaISO);
+    if (mananaObj) return mananaObj;
+  }
+
+  // 3. Buscar por nombre del día de la semana (ej: "lunes", "el martes")
+  const diasSemana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+  for (const dia of diasSemana) {
+    if (textoLimpio.includes(dia)) {
+      const match = diasSugeridos.find(d => 
+        d.diaNombre.toLowerCase()
+          .replace(/á/g, 'a')
+          .replace(/é/g, 'e')
+          .replace(/í/g, 'i')
+          .replace(/ó/g, 'o')
+          .replace(/ú/g, 'u')
+          .includes(dia)
+      );
+      if (match) return match;
+    }
+  }
+
+  // 4. Formato de fecha explícito: DD/MM/YYYY o DD/MM
+  const regexCompleto = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
+  const matchCompleto = textoLimpio.match(regexCompleto);
+  if (matchCompleto) {
+    const diaVal = String(matchCompleto[1]).padStart(2, '0');
+    const mesVal = String(matchCompleto[2]).padStart(2, '0');
+    const anioVal = matchCompleto[3];
+    const iso = `${anioVal}-${mesVal}-${diaVal}`;
+    
+    const match = diasSugeridos.find(d => d.fechaISO === iso);
+    if (match) return match;
+    
+    const dateObj = new Date(Number(anioVal), Number(mesVal) - 1, Number(diaVal));
+    const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+    if (dateObj >= hoy) {
+      const nombreDia = dateObj.toLocaleDateString('es-ES', { weekday: 'long' });
+      return {
+        fechaISO: iso,
+        fechaDisplay: `${diaVal}/${mesVal}/${anioVal}`,
+        diaNombre: nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1)
+      };
+    }
+  }
+
+  const regexCorto = /(\d{1,2})\/(\d{1,2})/;
+  const matchCorto = textoLimpio.match(regexCorto);
+  if (matchCorto && !matchCompleto) {
+    const diaVal = String(matchCorto[1]).padStart(2, '0');
+    const mesVal = String(matchCorto[2]).padStart(2, '0');
+    const anioVal = new Date().getFullYear();
+    const iso = `${anioVal}-${mesVal}-${diaVal}`;
+    
+    const match = diasSugeridos.find(d => d.fechaISO === iso);
+    if (match) return match;
+
+    const dateObj = new Date(anioVal, Number(mesVal) - 1, Number(diaVal));
+    const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+    if (dateObj >= hoy) {
+      const nombreDia = dateObj.toLocaleDateString('es-ES', { weekday: 'long' });
+      return {
+        fechaISO: iso,
+        fechaDisplay: `${diaVal}/${mesVal}/${anioVal}`,
+        diaNombre: nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1)
+      };
+    }
+  }
+
+  return null;
+}
+
+function buscarHoraEnTexto(texto, slots) {
+  if (!texto) return null;
+  const textoLimpio = texto.toLowerCase().trim()
+    .replace(/á/g, 'a')
+    .replace(/é/g, 'e')
+    .replace(/í/g, 'i')
+    .replace(/ó/g, 'o')
+    .replace(/ú/g, 'u');
+
+  // 1. Ver si es un número de opción directo (ej: "1", "la 3")
+  const matchOpcion = textoLimpio.match(/^\s*(?:(?:la\s+)?opcion\s+)?(\d+)\s*$/);
+  if (matchOpcion) {
+    const idx = parseInt(matchOpcion[1]) - 1;
+    if (idx >= 0 && idx < slots.length) {
+      return slots[idx];
+    }
+  }
+
+  // 2. Extraer horas y minutos
+  let horaEncontrada = null;
+  let minEncontrado = 0;
+  let esPM = false;
+  let esAM = false;
+
+  if (textoLimpio.includes('pm') || textoLimpio.includes('tarde') || textoLimpio.includes('noche')) {
+    esPM = true;
+  } else if (textoLimpio.includes('am') || textoLimpio.includes('manana')) {
+    esAM = true;
+  }
+
+  // Formato: HH:MM o HH.MM
+  const regexHoraMin = /(\d{1,2})[:.](\d{2})/;
+  const matchHM = textoLimpio.match(regexHoraMin);
+
+  if (matchHM) {
+    horaEncontrada = parseInt(matchHM[1]);
+    minEncontrado = parseInt(matchHM[2]);
+  } else {
+    // Formato: solo un número solo o con "a las" (ej: "a las 10", "las 5")
+    const matchH = textoLimpio.match(/(?:a\s+la[s]?\s+)?(\d{1,2})/);
+    if (matchH) {
+      horaEncontrada = parseInt(matchH[1]);
+      minEncontrado = 0;
+    }
+  }
+
+  if (horaEncontrada !== null) {
+    if (esPM && horaEncontrada < 12) {
+      horaEncontrada += 12;
+    } else if (esAM && horaEncontrada === 12) {
+      horaEncontrada = 0;
+    }
+
+    // Auto-detección inteligente de AM/PM
+    if (!esAM && !esPM && horaEncontrada >= 1 && horaEncontrada <= 7) {
+      const horaPM = horaEncontrada + 12;
+      const slotPMStr = `${String(horaPM).padStart(2, '0')}:${String(minEncontrado).padStart(2, '0')}`;
+      if (slots.includes(slotPMStr)) {
+        horaEncontrada = horaPM;
+      }
+    }
+
+    const horaBuscadaStr = `${String(horaEncontrada).padStart(2, '0')}:${String(minEncontrado).padStart(2, '0')}`;
+    
+    // Buscar coincidencia exacta
+    if (slots.includes(horaBuscadaStr)) {
+      return horaBuscadaStr;
+    }
+
+    // Buscar coincidencia parcial (solo por hora)
+    if (!matchHM) {
+      const coincidenciaHora = slots.find(s => s.startsWith(`${String(horaEncontrada).padStart(2, '0')}:`));
+      if (coincidenciaHora) {
+        return coincidenciaHora;
+      }
+    }
+  }
+
+  return null;
+}
+
 const PORT = parseInt(process.env.PORT || '3001');
 const DASHBOARD_PIN = process.env.DASHBOARD_PIN || '1234';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'citas-medicas-secret-2026';
@@ -547,6 +755,8 @@ async function inicializarBD() {
     dias_laborales TEXT,
     hora_inicio TEXT,
     hora_fin TEXT,
+    receso_inicio TEXT,
+    receso_fin TEXT,
     duracion_cita INTEGER,
     direccion TEXT,
     google_maps_url TEXT,
@@ -568,6 +778,44 @@ async function inicializarBD() {
     telefono TEXT,
     creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS bloqueos_agenda (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT,
+    hora_inicio TEXT,
+    hora_fin TEXT,
+    descripcion TEXT,
+    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS servicios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT UNIQUE,
+    duracion INTEGER,
+    descripcion TEXT,
+    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Pre-poblar servicios
+  const servicesCount = await new Promise((resolve) => {
+    db.get('SELECT COUNT(*) as count FROM servicios', (err, row) => resolve(row ? row.count : 0));
+  });
+  if (servicesCount === 0) {
+    const defaultServices = [
+      ['Consulta General', 30, 'Consulta ordinaria de seguimiento o sintomatología común.'],
+      ['Primera Vez', 60, 'Consulta de valoración inicial para nuevos pacientes.'],
+      ['Revisión', 20, 'Chequeo rápido de evolución o lectura de estudios/análisis.']
+    ];
+    for (const service of defaultServices) {
+      await new Promise((resolve) => {
+        db.run(
+          'INSERT INTO servicios (nombre, duracion, descripcion) VALUES (?, ?, ?)',
+          service,
+          () => resolve()
+        );
+      });
+    }
+  }
 
   // Configuracion por defecto
   const count = await new Promise((resolve, reject) => {
@@ -611,6 +859,9 @@ async function inicializarBD() {
   await addColumn('configuraciones', 'mensaje_ayuda TEXT');
   await addColumn('configuraciones', 'telefono_doctor TEXT');
   await addColumn('configuraciones', 'max_mensajes_dia INTEGER DEFAULT 15');
+  await addColumn('configuraciones', 'receso_inicio TEXT');
+  await addColumn('configuraciones', 'receso_fin TEXT');
+  await addColumn('citas', 'servicio_id INTEGER');
 
   const defaultBienvenida = `🏥 *Chatbot de Citas Medicas*\n\nHola, soy tu asistente virtual. ¿En que puedo ayudarte?\n\n📅 *Agendar cita* - Escribe "cita" o "agendar"\n📋 *Mis citas* - Escribe "mis citas" o "consultar"\n❌ *Cancelar cita* - Escribe "cancelar"\n❓ *Ayuda* - Escribe "ayuda"\n\nEscribe una opcion para comenzar.`;
   const defaultAyuda = `❓ *Ayuda - Chatbot de Citas*\n\n📅 *Agendar cita:*\n1. Escribe "cita" o "agendar"\n2. Sigue las instrucciones paso a paso\n3. Confirma tu cita\n\n📋 *Consultar citas:*\n- Escribe "mis citas" para ver tus proximas citas\n\n❌ *Cancelar cita:*\n- Escribe "cancelar" para cancelar una cita\n\n🔄 *Reagendar cita:*\n- Cuando recibas un recordatorio, responde "3" o "reagendar"\n\n💡 *Tips:*\n- Usa fechas en formato DD/MM/YYYY\n- Responde a recordatorios con: 1 (Confirmar), 2 (Cancelar), 3 (Reagendar)`;
@@ -735,19 +986,17 @@ async function iniciarAgendamiento(telefono) {
     db.get('SELECT nombre FROM pacientes WHERE telefono = ?', [telefono], (err, row) => resolve(row));
   });
 
-  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(7);
-
   if (paciente && paciente.nombre) {
     const nombre = paciente.nombre.trim();
-    const datos = { nombre, fechasSugeridas: diasDisponibles.map(d => d.fechaISO) };
-    await guardarEstadoConversacion(telefono, 'esperando_fecha', datos);
+    const servicios = await dbAll('SELECT id, nombre, duracion FROM servicios ORDER BY id');
+    const datos = { nombre };
+    await guardarEstadoConversacion(telefono, 'esperando_servicio', datos);
 
-    let msg = `📅 *Agendar Nueva Cita*\n\nHola *${nombre}*, gusto en saludarte nuevamente. 😊\n\n¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 17/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
-    const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
-    diasDisponibles.forEach((dia, idx) => {
-      const emoji = emojis[idx] || `${idx + 1}.`;
-      msg += `${emoji} *${dia.diaNombre} ${dia.fechaDisplay}* (${dia.slotsCount} horarios)\n`;
+    let msg = `📅 *Agendar Nueva Cita*\n\nHola *${nombre}*, gusto en saludarte nuevamente. 😊\n\nPor favor, selecciona el servicio o tipo de consulta que deseas agendar:\n\n`;
+    servicios.forEach((s, idx) => {
+      msg += `${idx + 1}️⃣ *${s.nombre}* (${s.duracion} min)\n`;
     });
+    msg += `\nResponde con el *número* de la opción que prefieras.`;
     await recordatorios.enviarMensaje(telefono, msg);
   } else {
     // Si no está registrado, pedir su nombre completo
@@ -761,13 +1010,53 @@ async function iniciarAgendamiento(telefono) {
 
 async function procesarNombre(telefono, nombre, estado) {
   const datos = JSON.parse(estado.datos || '{}');
-  datos.nombre = nombre;
+  datos.nombre = nombre.trim();
   
-  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(7);
+  const servicios = await dbAll('SELECT id, nombre, duracion FROM servicios ORDER BY id');
+  await guardarEstadoConversacion(telefono, 'esperando_servicio', datos);
+
+  let msg = `✅ Nombre registrado: *${datos.nombre}*\n\n📅 *Selecciona tu Servicio*\n\nPor favor, responde con el *número* del servicio que deseas agendar:\n\n`;
+  servicios.forEach((s, idx) => {
+    msg += `${idx + 1}️⃣ *${s.nombre}* (${s.duracion} min)\n`;
+  });
+  msg += `\nResponde con el *número* de la opción que prefieras.`;
+  await recordatorios.enviarMensaje(telefono, msg);
+}
+
+async function procesarServicio(telefono, respuesta, estado) {
+  const datos = JSON.parse(estado.datos || '{}');
+  const servicios = await dbAll('SELECT id, nombre, duracion FROM servicios ORDER BY id');
+  
+  let servicioElegido = null;
+  const idx = parseInt(respuesta.trim()) - 1;
+  if (!isNaN(idx) && idx >= 0 && idx < servicios.length) {
+    servicioElegido = servicios[idx];
+  } else {
+    const txt = respuesta.toLowerCase().trim();
+    servicioElegido = servicios.find(s => 
+      s.nombre.toLowerCase().replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i').replace(/ó/g, 'o').replace(/ú/g, 'u').includes(txt)
+    );
+  }
+
+  if (!servicioElegido) {
+    let msg = `❌ Opción no válida. Por favor, selecciona un servicio respondiendo con el *número*:\n\n`;
+    servicios.forEach((s, i) => {
+      msg += `${i + 1}️⃣ *${s.nombre}* (${s.duracion} min)\n`;
+    });
+    await recordatorios.enviarMensaje(telefono, msg);
+    return;
+  }
+
+  datos.servicioId = servicioElegido.id;
+  datos.servicioNombre = servicioElegido.nombre;
+  datos.duracion = servicioElegido.duracion;
+
+  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(7, datos.duracion);
   datos.fechasSugeridas = diasDisponibles.map(d => d.fechaISO);
+  
   await guardarEstadoConversacion(telefono, 'esperando_fecha', datos);
 
-  let msg = `✅ Nombre: *${nombre}*\n\n📅 ¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 17/06/2026) o responde con el *número* de una opción sugerida:\n\n`;
+  let msg = `✅ Servicio seleccionado: *${datos.servicioNombre}* (${datos.duracion} min)\n\n📅 ¿Para qué fecha deseas tu cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 17/06/2026), di algo como *"mañana"* o *"el lunes"*, o responde con el *número* de una opción sugerida:\n\n`;
   const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
   diasDisponibles.forEach((dia, idx) => {
     const emoji = emojis[idx] || `${idx + 1}.`;
@@ -779,40 +1068,21 @@ async function procesarNombre(telefono, nombre, estado) {
 
 async function procesarFecha(telefono, fecha, estado) {
   const datos = JSON.parse(estado.datos || '{}');
-  const idx = parseInt(fecha.trim()) - 1;
-  const sugeridas = datos.fechasSugeridas || [];
-  
-  let fechaISO = '';
-  let fechaDisplay = '';
-  
-  if (!isNaN(idx) && idx >= 0 && idx < sugeridas.length) {
-    fechaISO = sugeridas[idx];
-    const [anio, mes, dia] = fechaISO.split('-');
-    fechaDisplay = `${dia}/${mes}/${anio}`;
-  } else {
-    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    if (!regex.test(fecha.trim())) {
-      await recordatorios.enviarMensaje(
-        telefono,
-        '❌ Formato de fecha inválido o número de opción incorrecto. Usa DD/MM/YYYY (ej: 17/06/2026) o responde con el número de opción sugerida.'
-      );
-      return;
-    }
-    const [, dia, mes, anio] = fecha.trim().match(regex);
-    
-    // Validar que la fecha no sea en el pasado
-    const dateObj = new Date(anio, mes - 1, dia);
-    const hoy = new Date();
-    hoy.setHours(0,0,0,0);
-    if (dateObj < hoy) {
-      await recordatorios.enviarMensaje(telefono, '❌ La fecha no puede ser en el pasado. Escribe una fecha de hoy en adelante (ej: 17/06/2026).');
-      return;
-    }
-    fechaISO = `${anio}-${mes}-${dia}`;
-    fechaDisplay = `${dia}/${mes}/${anio}`;
+  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(7, datos.duracion);
+  const diaEncontrado = buscarFechaEnTexto(fecha, diasDisponibles);
+
+  if (!diaEncontrado) {
+    await recordatorios.enviarMensaje(
+      telefono,
+      '❌ No entendí la fecha. Por favor escribe la fecha en formato DD/MM/YYYY (ej: 17/06/2026), di algo como "mañana" o "el lunes", o responde con el número de opción sugerida.'
+    );
+    return;
   }
 
-  const slots = await recordatorios.obtenerHorariosDisponibles(fechaISO);
+  const fechaISO = diaEncontrado.fechaISO;
+  const fechaDisplay = diaEncontrado.fechaDisplay;
+
+  const slots = await recordatorios.obtenerHorariosDisponibles(fechaISO, datos.duracion);
   if (slots.length === 0) {
     await recordatorios.enviarMensaje(telefono, `❌ No hay horarios disponibles para el ${fechaDisplay}. Por favor escribe otra fecha.`);
     return;
@@ -823,21 +1093,23 @@ async function procesarFecha(telefono, fecha, estado) {
   await guardarEstadoConversacion(telefono, 'esperando_seleccion_hora', datos);
   let mensajeSlots = `📅 *Horarios disponibles para el ${fechaDisplay}*:\n\n`;
   slots.forEach((slot, i) => { mensajeSlots += `${i + 1}️⃣ ${slot}\n`; });
-  mensajeSlots += `\nResponde con el *numero* del horario que prefieras.`;
+  mensajeSlots += `\nResponde con el *número* del horario o escribe directamente la hora (ej: *"a las 5 PM"* o *"10:30"*).`;
   await recordatorios.enviarMensaje(telefono, mensajeSlots);
 }
 
 async function procesarSeleccionHora(telefono, respuesta, estado) {
   const datos = JSON.parse(estado.datos || '{}');
-  const idx = parseInt(respuesta.trim()) - 1;
   const slots = datos.slots || [];
-  if (isNaN(idx) || idx < 0 || idx >= slots.length) {
-    let msg = `❌ Seleccion invalida. Responde con el numero del horario:\n\n`;
+  const horaSeleccionada = buscarHoraEnTexto(respuesta, slots);
+
+  if (!horaSeleccionada) {
+    let msg = `❌ Selección de horario no reconocida. Responde con el número del horario o escribe directamente la hora (ej: "a las 5 PM" o "10:30"):\n\n`;
     slots.forEach((slot, i) => { msg += `${i + 1}️⃣ ${slot}\n`; });
     await recordatorios.enviarMensaje(telefono, msg);
     return;
   }
-  datos.hora = slots[idx];
+
+  datos.hora = horaSeleccionada;
   await guardarEstadoConversacion(telefono, 'esperando_motivo', datos);
   await recordatorios.enviarMensaje(telefono, `✅ Hora seleccionada: ${datos.hora}\n\n📝 ¿Cual es el motivo de tu cita?\nEjemplos: "consulta general", "revision", "analisis"`);
 }
@@ -858,8 +1130,8 @@ async function procesarConfirmacion(telefono, respuesta, estado) {
     await dbRun('INSERT OR REPLACE INTO pacientes (telefono, nombre) VALUES (?, ?)', [telefono, datos.nombre]);
     const paciente = await dbGet('SELECT id FROM pacientes WHERE telefono = ?', [telefono]);
     await dbRun(
-      'INSERT INTO citas (paciente_id, fecha, hora, motivo, estado) VALUES (?, ?, ?, ?, ?)',
-      [paciente.id, datos.fecha, datos.hora, datos.motivo, 'confirmada']
+      'INSERT INTO citas (paciente_id, fecha, hora, motivo, estado, servicio_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [paciente.id, datos.fecha, datos.hora, datos.motivo, 'confirmada', datos.servicioId || null]
     );
     await limpiarEstadoConversacion(telefono);
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
@@ -961,28 +1233,21 @@ async function procesarCancelacion(telefono, respuesta, estado) {
 
 async function procesarReagendandoFecha(telefono, fecha, estado) {
   const datos = JSON.parse(estado.datos || '{}');
-  const idx = parseInt(fecha.trim()) - 1;
-  const sugeridas = datos.fechasSugeridas || [];
-  
-  let fechaISO = '';
-  let fechaDisplay = '';
-  
-  if (!isNaN(idx) && idx >= 0 && idx < sugeridas.length) {
-    fechaISO = sugeridas[idx];
-    const [anio, mes, dia] = fechaISO.split('-');
-    fechaDisplay = `${dia}/${mes}/${anio}`;
-  } else {
-    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    if (!regex.test(fecha.trim())) {
-      await recordatorios.enviarMensaje(telefono, '❌ Formato inválido o número de opción incorrecto. Usa DD/MM/YYYY (ej: 20/06/2026) o responde con el número de opción.');
-      return;
-    }
-    const [, dia, mes, anio] = fecha.trim().match(regex);
-    fechaISO = `${anio}-${mes}-${dia}`;
-    fechaDisplay = `${dia}/${mes}/${anio}`;
+  const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(7, datos.duracion);
+  const diaEncontrado = buscarFechaEnTexto(fecha, diasDisponibles);
+
+  if (!diaEncontrado) {
+    await recordatorios.enviarMensaje(
+      telefono,
+      '❌ No entendí la fecha. Por favor escribe la fecha en formato DD/MM/YYYY (ej: 20/06/2026), di algo como "mañana" o "el lunes", o responde con el número de opción.'
+    );
+    return;
   }
 
-  const slots = await recordatorios.obtenerHorariosDisponibles(fechaISO);
+  const fechaISO = diaEncontrado.fechaISO;
+  const fechaDisplay = diaEncontrado.fechaDisplay;
+
+  const slots = await recordatorios.obtenerHorariosDisponibles(fechaISO, datos.duracion);
   if (slots.length === 0) {
     await recordatorios.enviarMensaje(telefono, `❌ No hay horarios disponibles para el ${fechaDisplay}. Escribe otra fecha.`);
     return;
@@ -993,21 +1258,23 @@ async function procesarReagendandoFecha(telefono, fecha, estado) {
   await guardarEstadoConversacion(telefono, 'reagendando_seleccion_hora', datos);
   let msg = `📅 *Horarios disponibles para el ${fechaDisplay}*:\n\n`;
   slots.forEach((slot, i) => { msg += `${i + 1}️⃣ ${slot}\n`; });
-  msg += `\nResponde con el *numero* del horario que prefieras.`;
+  msg += `\nResponde con el *número* del horario o escribe directamente la hora (ej: *"a las 5 PM"* o *"10:30"*).`;
   await recordatorios.enviarMensaje(telefono, msg);
 }
 
 async function procesarReagendandoSeleccionHora(telefono, respuesta, estado) {
   const datos = JSON.parse(estado.datos || '{}');
-  const idx = parseInt(respuesta.trim()) - 1;
   const slots = datos.slots || [];
-  if (isNaN(idx) || idx < 0 || idx >= slots.length) {
-    let msg = `❌ Seleccion invalida:\n\n`;
+  const horaSeleccionada = buscarHoraEnTexto(respuesta, slots);
+
+  if (!horaSeleccionada) {
+    let msg = `❌ Selección de horario no reconocida. Responde con el número del horario o escribe directamente la hora (ej: "a las 5 PM" o "10:30"):\n\n`;
     slots.forEach((slot, i) => { msg += `${i + 1}️⃣ ${slot}\n`; });
     await recordatorios.enviarMensaje(telefono, msg);
     return;
   }
-  datos.nuevaHora = slots[idx];
+
+  datos.nuevaHora = horaSeleccionada;
   await guardarEstadoConversacion(telefono, 'reagendando_confirmar', datos);
   const msg = `📋 *Confirmar Reagendamiento*\n\n📅 Nueva fecha: ${datos.nuevaFechaDisplay || datos.nuevaFecha}\n⏰ Nueva hora: ${datos.nuevaHora}\n📝 Motivo: ${datos.motivo || 'Consulta general'}\n\n¿Confirmas el reagendamiento?\nResponde "si" o "no".`;
   await recordatorios.enviarMensaje(telefono, msg);
@@ -1023,8 +1290,8 @@ async function procesarReagendandoConfirmar(telefono, respuesta, estado) {
     await dbRun('INSERT OR REPLACE INTO pacientes (telefono, nombre) VALUES (?, ?)', [telefono, datos.nombre]);
     const paciente = await dbGet('SELECT id FROM pacientes WHERE telefono = ?', [telefono]);
     await dbRun(
-      'INSERT INTO citas (paciente_id, fecha, hora, motivo, estado, cita_original_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [paciente.id, datos.nuevaFecha, datos.nuevaHora, datos.motivo || 'Consulta general', 'confirmada', datos.citaOriginalId || null]
+      'INSERT INTO citas (paciente_id, fecha, hora, motivo, estado, cita_original_id, servicio_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [paciente.id, datos.nuevaFecha, datos.nuevaHora, datos.motivo || 'Consulta general', 'confirmada', datos.citaOriginalId || null, datos.servicioId || null]
     );
     await limpiarEstadoConversacion(telefono);
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
@@ -1047,6 +1314,30 @@ async function procesarReagendandoConfirmar(telefono, respuesta, estado) {
     await recordatorios.enviarMensaje(telefono, '❌ Reagendamiento cancelado. Tu cita original se mantiene. Escribe "mis citas" para consultar.');
   } else {
     await recordatorios.enviarMensaje(telefono, '❌ Respuesta no reconocida. Responde "si" o "no".');
+  }
+}
+
+async function procesarEmergenciaReagendarInicio(telefono, respuesta, estado) {
+  const datos = JSON.parse(estado.datos || '{}');
+  const accion = recordatorios.interpretarRespuesta(respuesta);
+
+  if (accion === 'confirmar') {
+    const diasDisponibles = await recordatorios.obtenerProximosDiasDisponibles(7, datos.duracion);
+    datos.fechasSugeridas = diasDisponibles.map(d => d.fechaISO);
+    await guardarEstadoConversacion(telefono, 'reagendando_fecha', datos);
+
+    let msg = `🔄 *Reagendar Cita (Prioritario)*\n\nHola *${datos.nombre}*, vamos a buscar un nuevo horario para tu cita.\n\n📅 ¿Para qué fecha deseas tu nueva cita?\nEscribe la fecha en formato *DD/MM/YYYY* (ej: 20/06/2026), di algo como *"mañana"* o *"el lunes"*, o responde con el *número* de una opción sugerida:\n\n`;
+    const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
+    diasDisponibles.forEach((dia, idx) => {
+      const emoji = emojis[idx] || `${idx + 1}.`;
+      msg += `${emoji} *${dia.diaNombre} ${dia.fechaDisplay}* (${dia.slotsCount} horarios)\n`;
+    });
+    await recordatorios.enviarMensaje(telefono, msg);
+  } else if (accion === 'cancelar') {
+    await limpiarEstadoConversacion(telefono);
+    await recordatorios.enviarMensaje(telefono, 'Entendido. Tu cita se mantiene cancelada. Si deseas agendar en el futuro, escribe *"cita"* o *"agendar"*.');
+  } else {
+    await recordatorios.enviarMensaje(telefono, '❌ Respuesta no reconocida. ¿Deseas reagendar tu cita cancelada por el imprevisto? Responde **SI** para reagendar o **NO** para mantenerla cancelada.');
   }
 }
 
@@ -1083,6 +1374,7 @@ async function procesarMensaje(telefono, mensaje) {
     } else {
       switch (estado.estado) {
         case 'esperando_nombre': return procesarNombre(telefono, mensaje, estado);
+        case 'esperando_servicio': return procesarServicio(telefono, mensaje, estado);
         case 'esperando_fecha': return procesarFecha(telefono, mensaje, estado);
         case 'esperando_seleccion_hora': return procesarSeleccionHora(telefono, mensaje, estado);
         case 'esperando_motivo': return procesarMotivo(telefono, mensaje, estado);
@@ -1092,6 +1384,7 @@ async function procesarMensaje(telefono, mensaje) {
         case 'reagendando_seleccion_hora': return procesarReagendandoSeleccionHora(telefono, mensaje, estado);
         case 'reagendando_confirmar': return procesarReagendandoConfirmar(telefono, mensaje, estado);
         case 'esperando_encuesta': return procesarEncuesta(telefono, mensaje, estado);
+        case 'emergencia_reagendar_inicio': return procesarEmergenciaReagendarInicio(telefono, mensaje, estado);
       }
     }
   }
@@ -1497,16 +1790,16 @@ app.get('/configuracion', async (req, res) => {
 
 app.post('/configuracion', async (req, res) => {
   try {
-    const { dias_laborales, hora_inicio, hora_fin, duracion_cita, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor, max_mensajes_dia } = req.body;
+    const { dias_laborales, hora_inicio, hora_fin, receso_inicio, receso_fin, duracion_cita, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor, max_mensajes_dia } = req.body;
     let diasStr = '[]';
     if (dias_laborales) {
       const arr = Array.isArray(dias_laborales) ? dias_laborales.map(Number) : [Number(dias_laborales)];
       diasStr = JSON.stringify(arr);
     }
     await dbRun(
-      `UPDATE configuraciones SET dias_laborales=?, hora_inicio=?, hora_fin=?, duracion_cita=?, direccion=?, google_maps_url=?, indicaciones=?, mensaje_bienvenida=?, mensaje_ayuda=?, telefono_doctor=?, max_mensajes_dia=?
+      `UPDATE configuraciones SET dias_laborales=?, hora_inicio=?, hora_fin=?, receso_inicio=?, receso_fin=?, duracion_cita=?, direccion=?, google_maps_url=?, indicaciones=?, mensaje_bienvenida=?, mensaje_ayuda=?, telefono_doctor=?, max_mensajes_dia=?
        WHERE id = (SELECT id FROM configuraciones LIMIT 1)`,
-      [diasStr, hora_inicio, hora_fin, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor || null, parseInt(max_mensajes_dia) || 15]
+      [diasStr, hora_inicio, hora_fin, receso_inicio || null, receso_fin || null, parseInt(duracion_cita) || 60, direccion, google_maps_url, indicaciones, mensaje_bienvenida, mensaje_ayuda, telefono_doctor || null, parseInt(max_mensajes_dia) || 15]
     );
     await recordatorios.actualizarCacheConfig();
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
@@ -1700,6 +1993,122 @@ app.get('/api/pacientes', async (req, res) => {
     const pacientes = await dbAll('SELECT * FROM pacientes ORDER BY nombre');
     res.json(pacientes);
   } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// ─── API de Servicios (Tipos de Consulta) ───────────────────────────
+app.get('/api/servicios', async (req, res) => {
+  try {
+    const list = await dbAll('SELECT * FROM servicios ORDER BY id');
+    res.json(list);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/servicios', async (req, res) => {
+  const { nombre, duracion, descripcion } = req.body;
+  if (!nombre || !duracion) return res.status(400).json({ error: 'Nombre y duración son requeridos.' });
+  try {
+    await dbRun(
+      'INSERT INTO servicios (nombre, duracion, descripcion) VALUES (?, ?, ?)',
+      [nombre.trim(), parseInt(duracion), (descripcion || '').trim()]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/servicios/:id', async (req, res) => {
+  try {
+    await dbRun('DELETE FROM servicios WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── API de Bloqueos de Agenda ──────────────────────────────────────
+app.get('/api/bloqueos', async (req, res) => {
+  try {
+    const list = await dbAll('SELECT * FROM bloqueos_agenda ORDER BY fecha DESC, hora_inicio ASC');
+    res.json(list);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/bloqueos', async (req, res) => {
+  const { fecha, hora_inicio, hora_fin, descripcion } = req.body;
+  if (!fecha) return res.status(400).json({ error: 'Fecha es requerida.' });
+  try {
+    await dbRun(
+      'INSERT INTO bloqueos_agenda (fecha, hora_inicio, hora_fin, descripcion) VALUES (?, ?, ?, ?)',
+      [fecha, hora_inicio || null, hora_fin || null, (descripcion || '').trim()]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/bloqueos/:id', async (req, res) => {
+  try {
+    await dbRun('DELETE FROM bloqueos_agenda WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── API de Emergencia Médica (Cancelación Masiva) ───────────────────
+app.post('/api/emergencia/cancelar-reagendar', async (req, res) => {
+  const { fecha, razon } = req.body;
+  if (!fecha) return res.status(400).json({ error: 'Fecha es requerida.' });
+  const razonTexto = (razon || 'un imprevisto médico').trim();
+  try {
+    const citas = await dbAll(`
+      SELECT c.id, c.hora, c.motivo, c.servicio_id, COALESCE(s.duracion, 60) as duracion, p.nombre as paciente_nombre, p.telefono
+      FROM citas c
+      JOIN pacientes p ON c.paciente_id = p.id
+      LEFT JOIN servicios s ON c.servicio_id = s.id
+      WHERE c.fecha = ? AND c.estado IN ('pendiente', 'confirmada')
+    `, [fecha]);
+
+    if (citas.length === 0) {
+      return res.json({ success: true, count: 0, message: 'No hay citas activas programadas para esa fecha.' });
+    }
+
+    const fechaFormateada = fecha.split('-').reverse().join('/');
+
+    for (const cita of citas) {
+      // 1. Cancelar cita en BD
+      await dbRun("UPDATE citas SET estado = 'cancelada' WHERE id = ?", [cita.id]);
+
+      // 2. Encolar mensaje saliente a través del bot
+      const telPac = recordatorios.normalizarTelefono(cita.telefono);
+      const mensajeAviso = `🚨 *Aviso de Emergencia Médica* 🚨\n\nEstimado/a *${cita.paciente_nombre}*, lamentamos informarle que debido a *${razonTexto}*, el doctor no podrá atenderle en su cita programada para el *${fechaFormateada}* a las *${cita.hora.substring(0, 5)}*.\n\nSu cita ha sido cancelada.\n\n¿Desea reagendar su cita? Responda **SI** y le guiaremos de inmediato para elegir un nuevo horario.`;
+      
+      await dbRun(
+        `INSERT INTO mensajes_pendientes (telefono, mensaje, estado, tipo, cita_id)
+         VALUES (?, ?, 'pendiente', 'manual', ?)`,
+        [telPac, mensajeAviso, cita.id]
+      );
+
+      // 3. Establecer estado de la conversación para reagendamiento prioritario
+      await guardarEstadoConversacion(telPac, 'emergencia_reagendar_inicio', {
+        nombre: cita.paciente_nombre,
+        motivo: cita.motivo,
+        servicioId: cita.servicio_id,
+        duracion: cita.duracion,
+        citaOriginalId: cita.id
+      });
+
+      // Notificar al doctor la cancelación
+      recordatorios.notificarAlDoctor('cancelacion', {
+        nombre: cita.paciente_nombre,
+        telefono: cita.telefono,
+        fecha: fechaFormateada,
+        hora: cita.hora,
+        motivo: `Cancelado por Emergencia: ${razonTexto}`
+      }).catch(err => console.error('Error enviando notificación al doctor:', err));
+    }
+
+    // Enviar mensajes en segundo plano
+    recordatorios.procesarMensajesPendientes().catch(err => console.error('Error enviando avisos de emergencia:', err));
+
+    res.json({ success: true, count: citas.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/recordatorios/forzar', async (req, res) => {

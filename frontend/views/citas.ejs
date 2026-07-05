@@ -262,6 +262,7 @@
                         <p class="text-muted mb-0">Listado y calendario de todas las consultas médicas</p>
                     </div>
                     <div class="d-inline-flex gap-2">
+                        <button type="button" class="btn btn-danger text-white d-inline-flex align-items-center" onclick="abrirModalEmergencia()"><i class="bi bi-exclamation-triangle-fill me-1"></i> <span class="d-none d-md-inline">Reportar Emergencia</span><span class="d-inline d-md-none">Emergencia</span></button>
                         <a href="/api/citas/exportar-csv" class="btn btn-outline-success d-none d-md-inline-flex"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar CSV</a>
                         <a href="/citas/nueva" class="btn btn-primary text-white"><i class="bi bi-calendar-plus me-1"></i> <span class="d-none d-sm-inline">Nueva Cita</span><span class="d-inline d-sm-none">Nueva</span></a>
                     </div>
@@ -716,6 +717,94 @@
                 calendar.render();
             });
         });
+
+        function abrirModalEmergencia() {
+            const hoyStr = new Date().toISOString().split('T')[0];
+            document.getElementById('emg-fecha').value = hoyStr;
+            document.getElementById('emg-razon').value = '';
+            var myModal = new bootstrap.Modal(document.getElementById('emergenciaModal'));
+            myModal.show();
+        }
+
+        async function confirmarEmergencia() {
+            const fecha = document.getElementById('emg-fecha').value;
+            const razon = document.getElementById('emg-razon').value;
+
+            if (!fecha) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Selecciona una fecha.' });
+                return;
+            }
+
+            const result = await Swal.fire({
+                title: '¿Confirmar Emergencia?',
+                text: 'Esta acción cancelará todas las citas confirmadas/pendientes de este día y enviará un aviso de WhatsApp a los pacientes. No se puede deshacer.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, cancelar y notificar',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (result.isConfirmed) {
+                try {
+                    Swal.fire({
+                        title: 'Procesando...',
+                        html: 'Cancelando citas y encolando avisos de WhatsApp...',
+                        allowOutsideClick: false,
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+
+                    const res = await fetch('/api/emergencia/cancelar-reagendar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fecha, razon })
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok && data.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Proceso completado',
+                            text: `Se cancelaron y notificaron ${data.count} citas correctamente.`
+                        }).then(() => {
+                            window.location.reload();
+                        });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Ocurrió un error.' });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Error al enviar petición.' });
+                }
+            }
+        }
     </script>
+
+    <!-- Modal Reportar Emergencia (Cancelar y Reagendar) -->
+    <div class="modal fade" id="emergenciaModal" tabindex="-1" aria-labelledby="emergenciaModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: var(--border-radius); background-color: var(--surface-color); color: var(--text-main); border: 1px solid var(--border-color);">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-danger" id="emergenciaModalLabel"><i class="bi bi-exclamation-octagon-fill me-2"></i> Reportar Emergencia</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Esto cancelará todas las citas activas de la fecha seleccionada y enviará notificaciones por WhatsApp a los pacientes afectados permitiéndoles reagendar.</p>
+                    <div class="mb-3">
+                        <label for="emg-fecha" class="form-label fw-semibold">Fecha a Cancelar</label>
+                        <input type="date" class="form-control" id="emg-fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emg-razon" class="form-label fw-semibold">Motivo / Razón de la cancelación</label>
+                        <textarea class="form-control" id="emg-razon" rows="3" placeholder="Ej. un imprevisto médico de fuerza mayor"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-danger btn-sm text-white" onclick="confirmarEmergencia()">Enviar Avisos y Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

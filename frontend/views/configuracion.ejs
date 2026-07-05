@@ -151,6 +151,19 @@
                                         </div>
                                     </div>
 
+                                    <div class="row mb-4">
+                                        <div class="col-6">
+                                            <label for="receso_inicio" class="form-label fw-semibold">Inicio de Receso (Opcional)</label>
+                                            <input type="time" class="form-control" id="receso_inicio" name="receso_inicio"
+                                                value="<%= config.receso_inicio || '' %>">
+                                        </div>
+                                        <div class="col-6">
+                                            <label for="receso_fin" class="form-label fw-semibold">Fin de Receso (Opcional)</label>
+                                            <input type="time" class="form-control" id="receso_fin" name="receso_fin"
+                                                value="<%= config.receso_fin || '' %>">
+                                        </div>
+                                    </div>
+
                                     <div class="mb-4">
                                         <label for="duracion_cita" class="form-label fw-semibold">Duración de Cita</label>
                                         <select class="form-select" id="duracion_cita" name="duracion_cita" required>
@@ -323,6 +336,107 @@
                         </div>
                     </div>
 
+                    <!-- Fila 4: Tipos de Cita y Bloqueos de Agenda (Avanzado) -->
+                    <div class="row g-4 mt-1">
+                        <!-- Servicios (Tipos de Consulta) -->
+                        <div class="col-lg-6">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-header bg-transparent border-0 pt-4 pb-0">
+                                    <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-tags-fill me-2"></i> Tipos de Consulta / Servicios</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive mb-3" style="max-height: 250px;">
+                                        <table class="table table-hover align-middle table-sm border-0" id="table-servicios">
+                                            <thead>
+                                                <tr>
+                                                    <th>Servicio</th>
+                                                    <th>Duración</th>
+                                                    <th class="text-end">Acción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Cargado vía JS -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <hr class="text-muted opacity-25">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle-fill me-1"></i> Agregar Nuevo Servicio</h6>
+                                    <div class="row g-2">
+                                        <div class="col-sm-7">
+                                            <input type="text" class="form-control form-control-sm" id="srv-nombre" placeholder="Nombre del servicio (ej: Limpieza)">
+                                        </div>
+                                        <div class="col-sm-5">
+                                            <select class="form-select form-select-sm" id="srv-duracion">
+                                                <option value="15">15 min</option>
+                                                <option value="20">20 min</option>
+                                                <option value="30" selected>30 min</option>
+                                                <option value="45">45 min</option>
+                                                <option value="60">60 min (1h)</option>
+                                                <option value="90">90 min</option>
+                                                <option value="120">120 min (2h)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <input type="text" class="form-control form-control-sm" id="srv-descripcion" placeholder="Descripción breve (opcional)">
+                                        </div>
+                                        <div class="col-12 text-end mt-2">
+                                            <button type="button" class="btn btn-sm btn-primary" onclick="agregarServicio()">
+                                                <i class="bi bi-plus-lg"></i> Agregar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bloqueos de Agenda -->
+                        <div class="col-lg-6">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-header bg-transparent border-0 pt-4 pb-0">
+                                    <h5 class="fw-bold mb-0 text-danger"><i class="bi bi-calendar-x-fill me-2"></i> Bloqueos de Agenda (Días Inhábiles)</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive mb-3" style="max-height: 250px;">
+                                        <table class="table table-hover align-middle table-sm border-0" id="table-bloqueos">
+                                            <thead>
+                                                <tr>
+                                                    <th>Fecha</th>
+                                                    <th>Horario</th>
+                                                    <th>Motivo</th>
+                                                    <th class="text-end">Acción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Cargado vía JS -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <hr class="text-muted opacity-25">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock-fill me-1"></i> Bloquear Fecha/Hora</h6>
+                                    <div class="row g-2">
+                                        <div class="col-sm-6">
+                                            <input type="date" class="form-control form-control-sm" id="blk-fecha">
+                                        </div>
+                                        <div class="col-sm-3">
+                                            <input type="time" class="form-control form-control-sm" id="blk-hora-inicio" placeholder="Inicio (opcional)">
+                                        </div>
+                                        <div class="col-sm-3">
+                                            <input type="time" class="form-control form-control-sm" id="blk-hora-fin" placeholder="Fin (opcional)">
+                                        </div>
+                                        <div class="col-12">
+                                            <input type="text" class="form-control form-control-sm" id="blk-descripcion" placeholder="Motivo (ej: Vacaciones, Congreso)">
+                                        </div>
+                                        <div class="col-12 text-end mt-2">
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="agregarBloqueo()">
+                                                <i class="bi bi-lock-fill"></i> Crear Bloqueo
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Botón de Envío -->
                     <div class="row mt-4">
                         <div class="col-12 text-end mb-4">
@@ -395,6 +509,9 @@
             updateThemePreviewCard(currentTheme);
 
             if (window.lucide) window.lucide.createIcons();
+
+            loadServicios();
+            loadBloqueos();
         });
 
         async function loadUnreadCount() {
@@ -441,6 +558,136 @@
 
         async function reconectarWA() {
             try { await fetch('/api/whatsapp/reconectar', { method: 'POST' }); } catch (e) {}
+        }
+
+        // Funciones para Gestión de Servicios
+        async function loadServicios() {
+            try {
+                const res = await fetch('/api/servicios');
+                const list = await res.json();
+                const tbody = document.querySelector('#table-servicios tbody');
+                tbody.innerHTML = '';
+                if (list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No hay servicios registrados.</td></tr>';
+                    return;
+                }
+                list.forEach(s => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${s.nombre}</strong><br><small class="text-muted">${s.descripcion || ''}</small></td>
+                            <td><span class="badge bg-secondary">${s.duracion} min</span></td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="eliminarServicio(${s.id})">
+                                    <i class="bi bi-trash3-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (err) { console.error('Error cargando servicios:', err); }
+        }
+
+        async function agregarServicio() {
+            const nombre = document.getElementById('srv-nombre').value;
+            const duracion = document.getElementById('srv-duracion').value;
+            const descripcion = document.getElementById('srv-descripcion').value;
+
+            if (!nombre) {
+                alert('Ingresa el nombre del servicio.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/servicios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, duracion, descripcion })
+                });
+                if (res.ok) {
+                    document.getElementById('srv-nombre').value = '';
+                    document.getElementById('srv-descripcion').value = '';
+                    loadServicios();
+                } else {
+                    const data = await res.json();
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) { alert('Error agregando servicio.'); }
+        }
+
+        async function eliminarServicio(id) {
+            if (!confirm('¿Estás seguro de eliminar este servicio?')) return;
+            try {
+                const res = await fetch(`/api/servicios/${id}`, { method: 'DELETE' });
+                if (res.ok) loadServicios();
+            } catch (err) { alert('Error al eliminar servicio.'); }
+        }
+
+        // Funciones para Bloqueos de Agenda
+        async function loadBloqueos() {
+            try {
+                const res = await fetch('/api/bloqueos');
+                const list = await res.json();
+                const tbody = document.querySelector('#table-bloqueos tbody');
+                tbody.innerHTML = '';
+                if (list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No hay bloqueos configurados.</td></tr>';
+                    return;
+                }
+                list.forEach(b => {
+                    const fDisp = b.fecha.split('-').reverse().join('/');
+                    const horario = (b.hora_inicio && b.hora_fin) ? `${b.hora_inicio} - ${b.hora_fin}` : 'Todo el día';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${fDisp}</strong></td>
+                            <td><span class="badge bg-danger-subtle text-danger">${horario}</span></td>
+                            <td><small class="text-muted">${b.descripcion || '-'}</small></td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="eliminarBloqueo(${b.id})">
+                                    <i class="bi bi-trash3-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (err) { console.error('Error cargando bloqueos:', err); }
+        }
+
+        async function agregarBloqueo() {
+            const fecha = document.getElementById('blk-fecha').value;
+            const hora_inicio = document.getElementById('blk-hora-inicio').value;
+            const hora_fin = document.getElementById('blk-hora-fin').value;
+            const descripcion = document.getElementById('blk-descripcion').value;
+
+            if (!fecha) {
+                alert('Selecciona una fecha para el bloqueo.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/bloqueos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fecha, hora_inicio, hora_fin, descripcion })
+                });
+                if (res.ok) {
+                    document.getElementById('blk-fecha').value = '';
+                    document.getElementById('blk-hora-inicio').value = '';
+                    document.getElementById('blk-hora-fin').value = '';
+                    document.getElementById('blk-descripcion').value = '';
+                    loadBloqueos();
+                } else {
+                    const data = await res.json();
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) { alert('Error agregando bloqueo.'); }
+        }
+
+        async function eliminarBloqueo(id) {
+            if (!confirm('¿Estás seguro de eliminar este bloqueo?')) return;
+            try {
+                const res = await fetch(`/api/bloqueos/${id}`, { method: 'DELETE' });
+                if (res.ok) loadBloqueos();
+            } catch (err) { alert('Error al eliminar bloqueo.'); }
         }
     </script>
 </body>
