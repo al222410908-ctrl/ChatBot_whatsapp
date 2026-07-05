@@ -2111,6 +2111,28 @@ app.post('/api/emergencia/cancelar-reagendar', async (req, res) => {
   }
 });
 
+app.get('/api/sistema/acceso-movil', async (req, res) => {
+  try {
+    const qrcode = require('qrcode');
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+    let ipLocal = '127.0.0.1';
+    for (const name of Object.keys(interfaces)) {
+      for (const net of interfaces[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          ipLocal = net.address;
+          break;
+        }
+      }
+    }
+    const urlDashboard = `http://${ipLocal}:${PORT}/dashboard`;
+    const qrCodeDataUrl = await qrcode.toDataURL(urlDashboard);
+    res.json({ ipLocal, urlDashboard, qrCodeDataUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/recordatorios/forzar', async (req, res) => {
   try {
     console.log('[Dashboard] Forzando envio de recordatorios...');
