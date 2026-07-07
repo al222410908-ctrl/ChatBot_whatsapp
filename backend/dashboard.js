@@ -862,6 +862,7 @@ async function inicializarBD() {
   await addColumn('configuraciones', 'receso_inicio TEXT');
   await addColumn('configuraciones', 'receso_fin TEXT');
   await addColumn('citas', 'servicio_id INTEGER');
+  await addColumn('citas', 'recordatorio_hoy_enviado INTEGER DEFAULT 0');
 
   const defaultBienvenida = `🏥 *Chatbot de Citas Medicas*\n\nHola, soy tu asistente virtual. ¿En que puedo ayudarte?\n\n📅 *Agendar cita* - Escribe "cita" o "agendar"\n📋 *Mis citas* - Escribe "mis citas" o "consultar"\n❌ *Cancelar cita* - Escribe "cancelar"\n❓ *Ayuda* - Escribe "ayuda"\n\nEscribe una opcion para comenzar.`;
   const defaultAyuda = `❓ *Ayuda - Chatbot de Citas*\n\n📅 *Agendar cita:*\n1. Escribe "cita" o "agendar"\n2. Sigue las instrucciones paso a paso\n3. Confirma tu cita\n\n📋 *Consultar citas:*\n- Escribe "mis citas" para ver tus proximas citas\n\n❌ *Cancelar cita:*\n- Escribe "cancelar" para cancelar una cita\n\n🔄 *Reagendar cita:*\n- Cuando recibas un recordatorio, responde "3" o "reagendar"\n\n💡 *Tips:*\n- Usa fechas en formato DD/MM/YYYY\n- Responde a recordatorios con: 1 (Confirmar), 2 (Cancelar), 3 (Reagendar)`;
@@ -2162,6 +2163,24 @@ app.post('/api/recordatorios/forzar', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+app.post('/api/recordatorios/hoy', async (req, res) => {
+  try {
+    console.log('[Dashboard] Enviando recordatorios para citas de hoy...');
+    const recordatoriosHoy = await recordatorios.verificarYEnviarRecordatoriosHoy(true);
+    console.log(`[Dashboard] Completado: ${recordatoriosHoy} recordatorio(s) de hoy enviados.`);
+
+    res.json({
+      success: true,
+      enviados: recordatoriosHoy,
+      mensaje: `Se enviaron ${recordatoriosHoy} recordatorio(s) para las citas de hoy.`
+    });
+  } catch (error) {
+    console.error('[Dashboard] Error enviando recordatorios de hoy:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 app.post('/api/recordatorios/reintentar', async (req, res) => {
   try {

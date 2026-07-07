@@ -406,6 +406,56 @@ function crearSistemaRecordatorios(db, getWaClient) {
     return result.success;
   };
 
+  // ─── Enviar recordatorio del mismo día ────────────────────────────
+  const enviarRecordatorioHoy = async (cita, forzarEnvio = false) => {
+    const config = await new Promise((resolve) => {
+      db.get('SELECT * FROM configuraciones LIMIT 1', (err, row) => {
+        resolve(row);
+      });
+    });
+    const lugar = config ? config.direccion : 'Consultorio / Centro Medico';
+
+    const mensaje = `🩺 *Recordatorio de tu Cita para Hoy*
+
+Hola ${cita.paciente_nombre}, te recordamos tu cita programada para el día de hoy:
+
+📅 *Fecha:* Hoy
+⏰ *Hora:* ${cita.hora.substring(0, 5)}
+📍 *Lugar:* ${lugar}
+📝 *Motivo:* ${cita.motivo || 'Consulta general'}
+
+${cita.estado === 'pendiente' ? 'Por favor confirma respondiendo:\n1️⃣ *Confirmar asistencia*\n2️⃣ *Cancelar*' : '¡Te esperamos puntualmente! 🩺'}`;
+
+    const msgId = await guardarMensajePendiente(
+      cita.paciente_telefono,
+      mensaje,
+      'recordatorio_hoy',
+      cita.id
+    );
+
+    const result = await self.enviarMensaje(cita.paciente_telefono, mensaje, 'bot', forzarEnvio);
+
+    if (result.success) {
+      await actualizarEstadoMensaje(msgId, 'enviado');
+      await new Promise((resolve, reject) => {
+        db.run(
+          `UPDATE citas SET recordatorio_hoy_enviado = 1 WHERE id = ?`,
+          [cita.id],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+    } else {
+      await actualizarEstadoMensaje(msgId, 'fallido');
+      console.warn(`Recordatorio de hoy NO enviado para cita ${cita.id}: ${result.error}`);
+    }
+
+    return result.success;
+  };
+
+
   // ─── Verificar y enviar recordatorios (24h antes) ──────────
   // forzar=true: ignora ventana horaria y marca recordatorio_enviado aunque ya este
   const verificarYEnviarRecordatorios = async (forzar = false) => {
@@ -485,6 +535,56 @@ function crearSistemaRecordatorios(db, getWaClient) {
       return 0;
     }
   };
+
+  // ─── Verificar y enviar recordatorios de hoy (mismo día) ─────
+  const verificarYEnviarRecordatoriosHoy = async (forzar = false) => {
+    try {
+      if (!forzar && !estaEnVentanaSegura()) {
+        const hora = new Date().getHours();
+        console.log(`[Recordatorios Hoy] Fuera de ventana (${hora}h).`);
+        return 0;
+      }
+
+      const hoyStr = obtenerFechaLocal(new Date());
+
+      const citas = await new Promise((resolve, reject) => {
+        const filtroEnviado = forzar ? '' : 'AND (c.recordatorio_hoy_enviado IS NULL OR c.recordatorio_hoy_enviado = 0)';
+        const sql = `SELECT c.*, p.nombre as paciente_nombre, p.telefono as paciente_telefono
+           FROM citas c
+           JOIN pacientes p ON c.paciente_id = p.id
+           WHERE c.fecha = ?
+           AND c.estado IN ('pendiente', 'confirmada', 'reagendada')
+           ${filtroEnviado}`;
+        db.all(sql, [hoyStr], (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        });
+      });
+
+      if (citas.length === 0) {
+        console.log(`[Recordatorios Hoy] Sin citas para procesar hoy. (Fecha: ${hoyStr})`);
+        return 0;
+      }
+
+      console.log(`[Recordatorios Hoy] Procesando ${citas.length} recordatorio(s) para hoy...`);
+
+      let enviados = 0;
+      for (const cita of citas) {
+        console.log(`  -> Enviando recordatorio de hoy a ${cita.paciente_nombre} (${cita.paciente_telefono}) - Cita: ${cita.hora}`);
+        const exito = await enviarRecordatorioHoy(cita, forzar);
+        if (exito) enviados++;
+        if (citas.length > 1) {
+          await delayAleatorio(1500, 3000);
+        }
+      }
+
+      return enviados;
+    } catch (error) {
+      console.error('Error en recordatorios de hoy:', error.message);
+      return 0;
+    }
+  };
+
 
   // ─── Verificar y enviar avisos de 10 minutos antes ──────────
   const verificarYEnviarAvisos10min = async (forzar = false) => {
@@ -658,7 +758,7 @@ Hola ${cita.paciente_nombre}, te recordamos que tu cita de hoy a las *${cita.hor
            JOIN citas c ON mp.cita_id = c.id
            JOIN pacientes p ON c.paciente_id = p.id
            LEFT JOIN servicios s ON c.servicio_id = s.id
-           WHERE mp.tipo = 'recordatorio'
+           WHERE mp.tipo IN ('recordatorio', 'recordatorio_hoy')
            AND mp.estado IN ('enviado', 'pendiente')
            AND p.telefono = ?
            AND c.estado IN ('pendiente', 'confirmada')
@@ -1195,7 +1295,9 @@ Puedes responder con el número o con tus propias palabras.`,
   };
 
   self.enviarRecordatorio = enviarRecordatorio;
+  self.enviarRecordatorioHoy = enviarRecordatorioHoy;
   self.verificarYEnviarRecordatorios = verificarYEnviarRecordatorios;
+  self.verificarYEnviarRecordatoriosHoy = verificarYEnviarRecordatoriosHoy;
   self.verificarYEnviarAvisos10min = verificarYEnviarAvisos10min;
   self.procesarRespuestaRecordatorio = procesarRespuestaRecordatorio;
   self.iniciarScheduler = iniciarScheduler;
