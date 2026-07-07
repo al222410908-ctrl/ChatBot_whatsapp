@@ -283,6 +283,7 @@
                                     <a href="/pacientes/nuevo" class="btn btn-outline-primary"><i class="bi bi-person-plus me-1"></i>Registrar Paciente</a>
                                     <a href="/mensajes" class="btn btn-outline-success"><i class="bi bi-chat-text me-1"></i>Enviar WhatsApp</a>
                                     <button class="btn btn-outline-info" onclick="forzarRecordatorios()"><i class="bi bi-bell-fill me-1"></i>Forzar Recordatorios</button>
+                                    <button class="btn btn-outline-primary" onclick="enviarRecordatoriosHoy()"><i class="bi bi-calendar2-check-fill me-1"></i>Recordatorios de Hoy</button>
                                     <button class="btn btn-outline-warning" onclick="reintentarFallidos()"><i class="bi bi-arrow-clockwise me-1"></i>Reintentar Fallidos</button>
                                     <button class="btn btn-outline-secondary" onclick="showTestMsgModal()"><i class="bi bi-send-check me-1"></i>Enviar Mensaje Prueba</button>
                                 </div>
@@ -741,6 +742,32 @@
                 Swal.fire('Error', 'No se pudieron forzar los recordatorios.', 'error');
             }
         }
+
+        async function enviarRecordatoriosHoy() {
+            Swal.fire({
+                title: 'Enviando recordatorios de hoy',
+                text: 'Buscando citas programadas para hoy...',
+                icon: 'info',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+            try {
+                const res = await fetch('/api/recordatorios/hoy', { method: 'POST' });
+                const data = await res.json();
+                const msg = data.mensaje || `Se enviaron los recordatorios de hoy correctamente.`;
+                Swal.fire({
+                    title: '¡Enviados!',
+                    text: msg,
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                setTimeout(() => location.reload(), 2000);
+            } catch (err) {
+                Swal.fire('Error', 'No se pudieron enviar los recordatorios de hoy.', 'error');
+            }
+        }
+
 
         async function reintentarFallidos() {
             Swal.fire({
