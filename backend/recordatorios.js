@@ -237,6 +237,9 @@ function crearSistemaRecordatorios(db, getWaClient) {
   moduleDb = db;
   actualizarCacheConfig();
 
+  const EventEmitter = require('events');
+  self.emitter = new EventEmitter();
+
   // ─── Envío de mensaje WhatsApp via cliente local ──────────────
   self.enviarMensaje = async (telefono, texto, remitente = 'bot', omitirAntiSpam = false) => {
     try {
@@ -851,6 +854,7 @@ ${config.direccion}${mapa}${indicaciones}`,
           motivo: mensajePendiente.motivo
         }).catch(err => console.error('Error enviando notificación al doctor:', err));
 
+        self.emitter.emit('cita_actualizada', { action: 'confirmed', citaId });
         return { processed: true, action: 'confirmed', citaId };
 
       } else if (accion === 'cancelar') {
@@ -883,6 +887,7 @@ Si deseas agendar una nueva cita, responde *"cita"* o *"agendar"* y te ayudaremo
           motivo: mensajePendiente.motivo
         }).catch(err => console.error('Error enviando notificación al doctor:', err));
 
+        self.emitter.emit('cita_actualizada', { action: 'cancelled', citaId });
         return { processed: true, action: 'cancelled', citaId };
 
       } else if (accion === 'reagendar') {

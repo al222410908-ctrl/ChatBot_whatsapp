@@ -700,6 +700,11 @@
             }
         });
 
+        sseConn.addEventListener('cita', e => {
+            console.log('🔔 Cambio en citas detectado. Recargando...', e.data);
+            window.location.reload();
+        });
+
         window.addEventListener('beforeunload', () => {
             if (sseConn) sseConn.close();
         });
