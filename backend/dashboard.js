@@ -323,6 +323,11 @@ function emitSSE(evento, datos) {
   });
 }
 
+// Escuchar cambios en citas desde recordatorios y propagarlos vía SSE
+recordatorios.emitter.on('cita_actualizada', (data) => {
+  emitSSE('cita', data);
+});
+
 // ── Deduplicacion de mensajes ─────────────────────────────────
 const processedMessageIds = new Set();
 
@@ -1185,6 +1190,7 @@ async function procesarConfirmacion(telefono, respuesta, estado) {
       'INSERT INTO citas (paciente_id, fecha, hora, motivo, estado, servicio_id) VALUES (?, ?, ?, ?, ?, ?)',
       [paciente.id, datos.fecha, datos.hora, datos.motivo, 'confirmada', datos.servicioId || null]
     );
+    emitSSE('cita', { accion: 'creada' });
     await limpiarEstadoConversacion(telefono);
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
     let ubicacion = '';
@@ -1301,6 +1307,7 @@ async function procesarCancelacion(telefono, respuesta, estado) {
   );
   
   await dbRun('UPDATE citas SET estado = ? WHERE id = ?', ['cancelada', citaIds[idx]]);
+  emitSSE('cita', { accion: 'cancelada' });
   await limpiarEstadoConversacion(telefono);
   await recordatorios.enviarMensaje(telefono, '✅ Cita cancelada exitosamente. Escribe "cita" si deseas agendar una nueva.');
   
@@ -1379,6 +1386,7 @@ async function procesarReagendandoConfirmar(telefono, respuesta, estado) {
       'INSERT INTO citas (paciente_id, fecha, hora, motivo, estado, cita_original_id, servicio_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [paciente.id, datos.nuevaFecha, datos.nuevaHora, datos.motivo || 'Consulta general', 'confirmada', datos.citaOriginalId || null, datos.servicioId || null]
     );
+    emitSSE('cita', { accion: 'reagendada' });
     await limpiarEstadoConversacion(telefono);
     const config = await dbGet('SELECT * FROM configuraciones LIMIT 1');
     let ubicacion = '';
@@ -1887,6 +1895,7 @@ app.post('/api/citas/:id/reprogramar', async (req, res) => {
     const { fecha, hora } = req.body;
     const citaId = req.params.id;
     await dbRun('UPDATE citas SET fecha = ?, hora = ? WHERE id = ?', [fecha, hora, citaId]);
+    emitSSE('cita', { accion: 'reprogramada', id: citaId });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
