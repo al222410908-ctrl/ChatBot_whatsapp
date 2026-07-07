@@ -1710,6 +1710,19 @@ app.post('/pacientes/:id/editar', async (req, res) => {
   } catch (error) { res.status(500).send('Error actualizando paciente'); }
 });
 
+app.post('/pacientes/:id/eliminar', async (req, res) => {
+  try {
+    const pacienteId = req.params.id;
+    const paciente = await dbGet('SELECT telefono FROM pacientes WHERE id = ?', [pacienteId]);
+    if (paciente) {
+      await dbRun('DELETE FROM conversaciones WHERE telefono = ?', [paciente.telefono]);
+    }
+    await dbRun('DELETE FROM citas WHERE paciente_id = ?', [pacienteId]);
+    await dbRun('DELETE FROM pacientes WHERE id = ?', [pacienteId]);
+    res.redirect('/pacientes');
+  } catch (error) { res.status(500).send('Error eliminando paciente'); }
+});
+
 // ─── Mensajes ─────────────────────────────────────────────────
 app.get('/mensajes', async (req, res) => {
   try {
