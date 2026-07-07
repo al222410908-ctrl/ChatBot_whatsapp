@@ -1140,7 +1140,21 @@ async function procesarConfirmacion(telefono, respuesta, estado) {
     if (config) {
       ubicacion = `\n\n📍 *Ubicacion del Consultorio:*\n${config.direccion}\n🗺️ *Mapa:* ${config.google_maps_url}\n⚠️ *Indicaciones:* ${config.indicaciones}`;
     }
-    await recordatorios.enviarMensaje(telefono, `✅ *Cita Confirmada*\n\n👤 Paciente: ${datos.nombre}\n📅 Fecha: ${datos.fechaDisplay || datos.fecha}\n⏰ Hora: ${datos.hora}\n📝 Motivo: ${datos.motivo}${ubicacion}\n\nTe enviaremos un recordatorio 24 horas antes.\n¡Gracias por agendar!`);
+
+    const hoyObj = new Date();
+    const mananaObj = new Date();
+    mananaObj.setDate(hoyObj.getDate() + 1);
+    const hoyStr = getLocalDateString(hoyObj);
+    const mananaStr = getLocalDateString(mananaObj);
+
+    let txtRecordatorio = 'Te enviaremos un recordatorio 24 horas antes.';
+    if (datos.fecha === hoyStr) {
+      txtRecordatorio = 'Te esperamos el día de hoy.';
+    } else if (datos.fecha === mananaStr) {
+      txtRecordatorio = 'Te enviaremos un recordatorio mañana antes de tu cita.';
+    }
+
+    await recordatorios.enviarMensaje(telefono, `✅ *Cita Confirmada*\n\n👤 Paciente: ${datos.nombre}\n📅 Fecha: ${datos.fechaDisplay || datos.fecha}\n⏰ Hora: ${datos.hora}\n📝 Motivo: ${datos.motivo}${ubicacion}\n\n${txtRecordatorio}\n¡Gracias por agendar!`);
     
     // Notificar al doctor en segundo plano
     recordatorios.notificarAlDoctor('creacion', {
@@ -1300,7 +1314,21 @@ async function procesarReagendandoConfirmar(telefono, respuesta, estado) {
     if (config) {
       ubicacion = `\n\n📍 *Ubicacion:*\n${config.direccion}\n🗺️ *Mapa:* ${config.google_maps_url}\n⚠️ *Indicaciones:* ${config.indicaciones}`;
     }
-    await recordatorios.enviarMensaje(telefono, `✅ *Cita Reagendada*\n\n📅 Nueva fecha: ${datos.nuevaFechaDisplay || datos.nuevaFecha}\n⏰ Nueva hora: ${datos.nuevaHora}\n📝 Motivo: ${datos.motivo || 'Consulta general'}${ubicacion}\n\nTe enviaremos un recordatorio 24 horas antes. ¡Gracias!`);
+
+    const hoyObj = new Date();
+    const mananaObj = new Date();
+    mananaObj.setDate(hoyObj.getDate() + 1);
+    const hoyStr = getLocalDateString(hoyObj);
+    const mananaStr = getLocalDateString(mananaObj);
+
+    let txtRecordatorio = 'Te enviaremos un recordatorio 24 horas antes.';
+    if (datos.nuevaFecha === hoyStr) {
+      txtRecordatorio = 'Te esperamos el día de hoy.';
+    } else if (datos.nuevaFecha === mananaStr) {
+      txtRecordatorio = 'Te enviaremos un recordatorio mañana antes de tu cita.';
+    }
+
+    await recordatorios.enviarMensaje(telefono, `✅ *Cita Reagendada*\n\n📅 Nueva fecha: ${datos.nuevaFechaDisplay || datos.nuevaFecha}\n⏰ Nueva hora: ${datos.nuevaHora}\n📝 Motivo: ${datos.motivo || 'Consulta general'}${ubicacion}\n\n${txtRecordatorio} ¡Gracias!`);
     
     // Notificar al doctor en segundo plano
     recordatorios.notificarAlDoctor('reagendamiento', {
