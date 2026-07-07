@@ -679,6 +679,17 @@
                     if (props.estado === 'cancelada') estadoBadge = '<span class="badge bg-danger">Cancelada</span>';
                     if (props.estado === 'reagendada') estadoBadge = '<span class="badge bg-info text-dark">Reagendada</span>';
 
+                    const startStr = info.event.startStr;
+                    let fechaHoraDisplay = '';
+                    if (startStr.includes('T')) {
+                        const [f, h] = startStr.split('T');
+                        const [yyyy, mm, dd] = f.split('-');
+                        fechaHoraDisplay = `${dd}/${mm}/${yyyy} a las ${h.substring(0, 5)} hrs`;
+                    } else {
+                        const [yyyy, mm, dd] = startStr.split('-');
+                        fechaHoraDisplay = `${dd}/${mm}/${yyyy}`;
+                    }
+
                     const modalContent = `
                         <div class="modal fade" id="calendarEventModal" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
@@ -690,7 +701,7 @@
                                     <div class="modal-body">
                                         <p class="mb-2"><strong>Paciente:</strong> ${props.paciente}</p>
                                         <p class="mb-2"><strong>Teléfono:</strong> +${props.telefono}</p>
-                                        <p class="mb-2"><strong>Fecha/Hora:</strong> ${new Date(info.event.start).toLocaleString('es-ES')}</p>
+                                        <p class="mb-2"><strong>Fecha/Hora:</strong> ${fechaHoraDisplay}</p>
                                         <p class="mb-2"><strong>Motivo:</strong> ${props.motivo}</p>
                                         <p class="mb-0"><strong>Estado:</strong> ${estadoBadge}</p>
                                     </div>
