@@ -60,6 +60,26 @@ function getLocalDateString(d = new Date()) {
   }
 }
 
+function getLocalTimeStr(d = new Date()) {
+  const timeZone = process.env.TZ || 'America/Mexico_City';
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(d);
+    const hour = String(parts.find(p => p.type === 'hour').value).padStart(2, '0');
+    const min = String(parts.find(p => p.type === 'minute').value).padStart(2, '0');
+    return `${hour}:${min}`;
+  } catch (err) {
+    const hour = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${hour}:${min}`;
+  }
+}
+
 function buscarFechaEnTexto(texto, diasSugeridos) {
   if (!texto) return null;
   const textoLimpio = texto.toLowerCase().trim()
@@ -983,15 +1003,24 @@ async function mostrarAyuda(telefono) {
 async function iniciarAgendamiento(telefono) {
   // 1. Verificar si el paciente ya tiene una cita pendiente o confirmada futura
   const hoyStr = getLocalDateString();
-  const citaExistente = await new Promise((resolve) => {
-    db.get(
+  const citasCandidatas = await new Promise((resolve) => {
+    db.all(
       `SELECT c.fecha, c.hora, c.estado FROM citas c
        JOIN pacientes p ON c.paciente_id = p.id
        WHERE p.telefono = ? AND c.fecha >= ? AND c.estado IN ('pendiente', 'confirmada')
-       ORDER BY c.fecha ASC, c.hora ASC LIMIT 1`,
+       ORDER BY c.fecha ASC, c.hora ASC`,
       [telefono, hoyStr],
-      (err, row) => resolve(row)
+      (err, rows) => resolve(rows || [])
     );
+  });
+
+  const horaActualStr = getLocalTimeStr();
+  const citaExistente = citasCandidatas.find(c => {
+    if (c.fecha > hoyStr) return true;
+    if (c.fecha === hoyStr) {
+      return c.hora > horaActualStr;
+    }
+    return false;
   });
 
   if (citaExistente) {
@@ -1196,11 +1225,21 @@ async function procesarConfirmacion(telefono, respuesta, estado) {
 
 async function consultarCitas(telefono) {
   const hoyStr = getLocalDateString();
-  const citas = await dbAll(
+  const rawCitas = await dbAll(
     `SELECT c.* FROM citas c JOIN pacientes p ON c.paciente_id = p.id
      WHERE p.telefono = ? AND c.fecha >= ? AND c.estado NOT IN ('cancelada', 'reagendada')
      ORDER BY c.fecha, c.hora`, [telefono, hoyStr]
   );
+
+  const horaActualStr = getLocalTimeStr();
+  const citas = rawCitas.filter(c => {
+    if (c.fecha > hoyStr) return true;
+    if (c.fecha === hoyStr) {
+      return c.hora > horaActualStr;
+    }
+    return false;
+  });
+
   if (citas.length === 0) {
     await recordatorios.enviarMensaje(telefono, '📋 No tienes citas proximas. Escribe "cita" para agendar una.');
   } else {
@@ -1217,11 +1256,21 @@ async function consultarCitas(telefono) {
 
 async function iniciarCancelacion(telefono) {
   const hoyStr = getLocalDateString();
-  const citas = await dbAll(
+  const rawCitas = await dbAll(
     `SELECT c.* FROM citas c JOIN pacientes p ON c.paciente_id = p.id
      WHERE p.telefono = ? AND c.fecha >= ? AND c.estado IN ('pendiente', 'confirmada')
      ORDER BY c.fecha, c.hora`, [telefono, hoyStr]
   );
+
+  const horaActualStr = getLocalTimeStr();
+  const citas = rawCitas.filter(c => {
+    if (c.fecha > hoyStr) return true;
+    if (c.fecha === hoyStr) {
+      return c.hora > horaActualStr;
+    }
+    return false;
+  });
+
   if (citas.length === 0) {
     await recordatorios.enviarMensaje(telefono, '📋 No tienes citas programadas para cancelar.');
     return;
