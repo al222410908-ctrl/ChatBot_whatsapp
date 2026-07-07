@@ -273,48 +273,68 @@ function crearSistemaRecordatorios(db, getWaClient) {
       }
 
       // Intentar resolver el ID correcto registrado en WhatsApp
-      let chatId = `${telFormateado}@c.us`;
-      try {
-        const numberId = await client.getNumberId(telFormateado);
-        if (numberId) {
-          chatId = numberId._serialized;
-          // Si el JID contiene 'lid', guardar el mapeo!
-          if (chatId.includes('lid')) {
-            const resolvedLid = chatId.replace(/@.*$/, '');
-            db.run(
-              'INSERT OR REPLACE INTO lid_mappings (lid, telefono) VALUES (?, ?)',
-              [resolvedLid, telFormateado],
-              (err) => {
-                if (err) console.error('❌ Error guardando mapeo LID:', err.message);
-                else console.log(`💾 Mapeo guardado en enviarMensaje: ${resolvedLid} -> ${telFormateado}`);
-              }
-            );
-          }
-        } else {
-          // Si es un número de México y no se encontró con 521, intentar con 52
-          if (telFormateado.startsWith('521') && telFormateado.length === 13) {
-            const telSinUno = '52' + telFormateado.substring(3);
-            const numberIdSinUno = await client.getNumberId(telSinUno);
-            if (numberIdSinUno) {
-              chatId = numberIdSinUno._serialized;
-              // Si el JID contiene 'lid', guardar el mapeo!
-              if (chatId.includes('lid')) {
-                const resolvedLid = chatId.replace(/@.*$/, '');
-                db.run(
-                  'INSERT OR REPLACE INTO lid_mappings (lid, telefono) VALUES (?, ?)',
-                  [resolvedLid, telFormateado],
-                  (err) => {
-                    if (err) console.error('❌ Error guardando mapeo LID:', err.message);
-                    else console.log(`💾 Mapeo guardado en enviarMensaje (sin 1): ${resolvedLid} -> ${telFormateado}`);
-                  }
-                );
+      let chatId = null;
+
+      // 1. Intentar resolver mapeo LID local
+      const mapeoLid = await new Promise((resolve) => {
+        db.get('SELECT lid FROM lid_mappings WHERE telefono = ?', [telFormateado], (err, row) => {
+          resolve(row ? row.lid : null);
+        });
+      });
+
+      if (mapeoLid) {
+        chatId = `${mapeoLid}@lid`;
+      } else if (telFormateado.length >= 14) {
+        // Fallback para IDs crudos de tipo LID
+        chatId = `${telFormateado}@lid`;
+      }
+
+      // 2. Si no es LID, resolver a c.us o intentar getNumberId
+      if (!chatId) {
+        chatId = `${telFormateado}@c.us`;
+        try {
+          const numberId = await client.getNumberId(telFormateado);
+          if (numberId) {
+            chatId = numberId._serialized;
+            // Si el JID contiene 'lid', guardar el mapeo!
+            if (chatId.includes('lid')) {
+              const resolvedLid = chatId.replace(/@.*$/, '');
+              db.run(
+                'INSERT OR REPLACE INTO lid_mappings (lid, telefono) VALUES (?, ?)',
+                [resolvedLid, telFormateado],
+                (err) => {
+                  if (err) console.error('❌ Error guardando mapeo LID:', err.message);
+                  else console.log(`💾 Mapeo guardado en enviarMensaje: ${resolvedLid} -> ${telFormateado}`);
+                }
+              );
+            }
+          } else {
+            // Si es un número de México y no se encontró con 521, intentar con 52
+            if (telFormateado.startsWith('521') && telFormateado.length === 13) {
+              const telSinUno = '52' + telFormateado.substring(3);
+              const numberIdSinUno = await client.getNumberId(telSinUno);
+              if (numberIdSinUno) {
+                chatId = numberIdSinUno._serialized;
+                // Si el JID contiene 'lid', guardar el mapeo!
+                if (chatId.includes('lid')) {
+                  const resolvedLid = chatId.replace(/@.*$/, '');
+                  db.run(
+                    'INSERT OR REPLACE INTO lid_mappings (lid, telefono) VALUES (?, ?)',
+                    [resolvedLid, telFormateado],
+                    (err) => {
+                      if (err) console.error('❌ Error guardando mapeo LID:', err.message);
+                      else console.log(`💾 Mapeo guardado en enviarMensaje (sin 1): ${resolvedLid} -> ${telFormateado}`);
+                    }
+                  );
+                }
               }
             }
           }
+        } catch (err) {
+          console.error('Error resolviendo WhatsApp ID:', err.message);
         }
-      } catch (err) {
-        console.error('Error resolviendo WhatsApp ID:', err.message);
       }
+
 
       await client.sendMessage(chatId, texto);
       console.log(`✅ [WA] Mensaje enviado a ${telFormateado}`);

@@ -601,10 +601,32 @@ async function inicializarWhatsApp() {
           }
         }
 
-        if (!rawNumber) {
-          console.log(`⚠️ No se pudo extraer número de: from=${from} author=${author}`);
-          return;
+        // Estrategia 2.5: Si es un LID, intentar obtener el número de teléfono real
+        if (!rawNumber && from.includes('lid')) {
+          try {
+            const lidPhoneResult = await client.getContactLidAndPhone([from]);
+            if (lidPhoneResult && lidPhoneResult.length > 0 && lidPhoneResult[0].pn) {
+              rawNumber = lidPhoneResult[0].pn;
+              console.log(`🔄 [LID RESOLVED] LID ${from} resuelto a pn: ${rawNumber}`);
+              
+              // Guardar mapeo en la BD
+              const resolvedLid = from.replace(/@.*$/, '');
+              db.run(
+                'INSERT OR REPLACE INTO lid_mappings (lid, telefono) VALUES (?, ?)',
+                [resolvedLid, rawNumber]
+              );
+            }
+          } catch (e) {
+            console.log(`⚠️ Error resolviendo LID para ${from}: ${e.message}`);
+          }
         }
+
+        // Estrategia Fallback final: Si aún no tenemos número, usar el ID limpio de from (LID o c.us)
+        if (!rawNumber) {
+          rawNumber = from.replace(/@.*$/, '');
+          console.log(`🔄 [LID FALLBACK] Usando ID crudo como número: ${rawNumber}`);
+        }
+
 
         // Deduplicar
         const msgId = message.id?.id || message.id?._serialized || String(message.id);
