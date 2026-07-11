@@ -1018,7 +1018,7 @@ Puedes responder con el número o con tus propias palabras.`,
   };
 
   // ─── Obtener horarios disponibles para una fecha ─────────────
-  const obtenerHorariosDisponibles = async (fecha, duracionCitaOverride = null) => {
+  const obtenerHorariosDisponibles = async (fecha, duracionCitaOverride = null, retornarTodos = false) => {
     const config = await new Promise((resolve, reject) => {
       db.get('SELECT * FROM configuraciones LIMIT 1', (err, row) => {
         if (err) reject(err);
@@ -1085,7 +1085,7 @@ Puedes responder con el número o con tus propias palabras.`,
       }
     }
 
-    const slots = [];
+    const candidates = [];
     let [hInicio, mInicio] = config.hora_inicio.split(':').map(Number);
     const [hFin, mFin] = config.hora_fin.split(':').map(Number);
     const duracion = duracionCitaOverride !== null ? Number(duracionCitaOverride) : (config.duracion_cita || 60);
@@ -1102,9 +1102,18 @@ Puedes responder con el número o con tus propias palabras.`,
       recesoEnd = new Date(2020, 0, 1, rhFin, rmFin);
     }
 
+    // Paso de rejilla fijo: 30 minutos (Puntos de anclaje)
+    const gridStep = 30;
+
     while (actual < limite) {
       const slotStart = new Date(actual.getTime());
       const slotEnd = new Date(actual.getTime() + duracion * 60 * 1000);
+
+      // Comprobar que no exceda el límite del día
+      if (slotEnd > limite) {
+        actual.setMinutes(actual.getMinutes() + gridStep);
+        continue;
+      }
 
       let enReceso = false;
       if (recesoStart && recesoEnd) {
@@ -1121,24 +1130,81 @@ Puedes responder con el número o con tus propias palabras.`,
         }
       }
 
-      const hh = String(actual.getHours()).padStart(2, '0');
-      const mm = String(actual.getMinutes()).padStart(2, '0');
-      const horaStr = `${hh}:${mm}`;
-
       if (!enReceso && !colisiona) {
-        slots.push(horaStr);
+        // Calcular Adjacency Score (Puntaje de Adyacencia para Agrupación Inteligente)
+        let score = 0;
+        for (const o of ocupados) {
+          // Si termina justo cuando empieza este slot
+          const diffBefore = Math.abs(slotStart.getTime() - o.end.getTime()) / (60 * 1000);
+          if (diffBefore <= 10) {
+            score += 2;
+          }
+          // Si empieza justo cuando termina este slot
+          const diffAfter = Math.abs(o.start.getTime() - slotEnd.getTime()) / (60 * 1000);
+          if (diffAfter <= 10) {
+            score += 2;
+          }
+        }
+
+        // Adyacencia al inicio/fin del día laboral
+        const inicioDia = parseTime(config.hora_inicio);
+        const finDia = parseTime(config.hora_fin);
+        if (slotStart.getTime() === inicioDia.getTime()) {
+          score += 1;
+        }
+        if (slotEnd.getTime() === finDia.getTime()) {
+          score += 1;
+        }
+
+        // Adyacencia a receso
+        if (recesoStart && recesoEnd) {
+          if (slotEnd.getTime() === recesoStart.getTime()) {
+            score += 1;
+          }
+          if (slotStart.getTime() === recesoEnd.getTime()) {
+            score += 1;
+          }
+        }
+
+        candidates.push({ start: slotStart, end: slotEnd, score });
       }
-      actual.setMinutes(actual.getMinutes() + duracion);
+
+      actual.setMinutes(actual.getMinutes() + gridStep);
     }
 
     const hoyStr = obtenerFechaLocal();
+    let finalCandidates = candidates;
+
+    // Si es hoy, filtrar slots del pasado
     if (fecha === hoyStr) {
       const ahora = new Date();
       const horaActualStr = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-      return slots.filter(slot => slot > horaActualStr);
+      finalCandidates = finalCandidates.filter(c => {
+        const hh = String(c.start.getHours()).padStart(2, '0');
+        const mm = String(c.start.getMinutes()).padStart(2, '0');
+        return `${hh}:${mm}` > horaActualStr;
+      });
     }
 
-    return slots;
+    // Si no se solicitan todos, hacer la agrupación inteligente y limitar a 6
+    if (!retornarTodos) {
+      finalCandidates.sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score; // Mayor adyacencia primero
+        }
+        return a.start - b.start; // Más temprano primero
+      });
+      // Tomar los top 6
+      finalCandidates = finalCandidates.slice(0, 6);
+      // Volver a ordenar cronológicamente para el paciente
+      finalCandidates.sort((a, b) => a.start - b.start);
+    }
+
+    return finalCandidates.map(c => {
+      const hh = String(c.start.getHours()).padStart(2, '0');
+      const mm = String(c.start.getMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    });
   };
 
   // ─── Obtener los próximos días disponibles con slots ─────────
@@ -1150,7 +1216,7 @@ Puedes responder con el número o con tus propias palabras.`,
       const d = new Date();
       d.setDate(hoy.getDate() + i);
       const fechaISO = obtenerFechaLocal(d);
-      const slots = await obtenerHorariosDisponibles(fechaISO);
+      const slots = await obtenerHorariosDisponibles(fechaISO, duracionCitaOverride, true);
       if (slots.length > 0) {
         const nombreDia = d.toLocaleDateString('es-ES', { weekday: 'long' });
         const diaNombre = nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1);

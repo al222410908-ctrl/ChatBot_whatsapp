@@ -702,6 +702,25 @@ async function inicializarWhatsApp() {
 
         emitSSE('mensaje', { tipo: 'recibido', remitente: 'paciente', telefono, texto, fecha: new Date() });
 
+        // 1. Verificar si está en la lista negra (contactos_excluidos)
+        const esExcluido = await new Promise((resolve) => {
+          db.get('SELECT 1 FROM contactos_excluidos WHERE telefono = ?', [telefono], (err, row) => resolve(!!row));
+        });
+        if (esExcluido) {
+          console.log(`🚫 [Chatbot Excluido] No se procesa mensaje de ${telefono} por estar en la lista negra.`);
+          return;
+        }
+
+        // 2. Verificar si está silenciado temporalmente
+        const conv = await dbGet('SELECT silenciado_hasta FROM conversaciones WHERE telefono = ?', [telefono]);
+        if (conv && conv.silenciado_hasta) {
+          const silenciadoHasta = new Date(conv.silenciado_hasta);
+          if (silenciadoHasta > new Date()) {
+            console.log(`🔕 [Chatbot Silenciado] No se procesa mensaje de ${telefono} hasta ${conv.silenciado_hasta} por intervención manual.`);
+            return;
+          }
+        }
+
         procesarMensaje(telefono, texto).catch(err => {
           console.error('❌ Error procesando mensaje:', err.message);
         });
@@ -716,8 +735,34 @@ async function inicializarWhatsApp() {
     // ── Fallback: message_create (algunas versiones de whatsapp-web.js
     //    solo emiten 'message_create' en vez de 'message') ──────────
     client.on('message_create', async (message) => {
-      // Solo procesar mensajes que NO son del bot (los propios se ignoran)
-      if (message.fromMe) return;
+      // Si el mensaje es enviado por el médico/bot (fromMe)
+      if (message.fromMe) {
+        try {
+          const recipient = message.to;
+          if (
+            recipient &&
+            !recipient.endsWith('@g.us') &&
+            !recipient.endsWith('@newsletter') &&
+            !recipient.endsWith('@broadcast') &&
+            recipient !== 'status@broadcast'
+          ) {
+            const rawNumber = recipient.replace(/@.*$/, '');
+            const telefono = recordatorios.normalizarTelefono(rawNumber);
+            if (telefono) {
+              const silenciadoHasta = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+              await dbRun(
+                `INSERT OR REPLACE INTO conversaciones (telefono, estado, datos, silenciado_hasta, actualizado_en)
+                 VALUES (?, NULL, NULL, ?, CURRENT_TIMESTAMP)`,
+                [telefono, silenciadoHasta]
+              );
+              console.log(`🔕 [Chatbot Intervenido] Silenciado chatbot para ${telefono} hasta ${silenciadoHasta} por mensaje saliente del médico.`);
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Error al registrar silencio automático:', e.message);
+        }
+        return;
+      }
       // El deduplicador evitará procesamiento doble
       _procesarMensajeEntrante(message);
     });
@@ -826,6 +871,12 @@ async function inicializarBD() {
     creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await run(`CREATE TABLE IF NOT EXISTS contactos_excluidos (
+    telefono TEXT PRIMARY KEY,
+    nombre TEXT,
+    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   await run(`CREATE TABLE IF NOT EXISTS bloqueos_agenda (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fecha TEXT,
@@ -910,6 +961,7 @@ async function inicializarBD() {
   await addColumn('configuraciones', 'receso_fin TEXT');
   await addColumn('citas', 'servicio_id INTEGER');
   await addColumn('citas', 'recordatorio_hoy_enviado INTEGER DEFAULT 0');
+  await addColumn('conversaciones', 'silenciado_hasta TEXT');
 
   const defaultBienvenida = `🏥 *Chatbot de Citas Medicas*\n\nHola, soy tu asistente virtual. ¿En que puedo ayudarte?\n\n📅 *Agendar cita* - Escribe "cita" o "agendar"\n📋 *Mis citas* - Escribe "mis citas" o "consultar"\n❌ *Cancelar cita* - Escribe "cancelar"\n❓ *Ayuda* - Escribe "ayuda"\n\nEscribe una opcion para comenzar.`;
   const defaultAyuda = `❓ *Ayuda - Chatbot de Citas*\n\n📅 *Agendar cita:*\n1. Escribe "cita" o "agendar"\n2. Sigue las instrucciones paso a paso\n3. Confirma tu cita\n\n📋 *Consultar citas:*\n- Escribe "mis citas" para ver tus proximas citas\n\n❌ *Cancelar cita:*\n- Escribe "cancelar" para cancelar una cita\n\n🔄 *Reagendar cita:*\n- Cuando recibas un recordatorio, responde "3" o "reagendar"\n\n💡 *Tips:*\n- Usa fechas en formato DD/MM/YYYY\n- Responde a recordatorios con: 1 (Confirmar), 2 (Cancelar), 3 (Reagendar)`;
@@ -1157,7 +1209,17 @@ async function procesarFecha(telefono, fecha, estado) {
 async function procesarSeleccionHora(telefono, respuesta, estado) {
   const datos = JSON.parse(estado.datos || '{}');
   const slots = datos.slots || [];
-  const horaSeleccionada = buscarHoraEnTexto(respuesta, slots);
+  let horaSeleccionada = buscarHoraEnTexto(respuesta, slots);
+
+  if (!horaSeleccionada) {
+    try {
+      // Intentar buscar en todos los slots disponibles (incluso los no listados en el top 6 sugerido)
+      const slotsCompletos = await recordatorios.obtenerHorariosDisponibles(datos.fecha, datos.duracion, true);
+      horaSeleccionada = buscarHoraEnTexto(respuesta, slotsCompletos);
+    } catch (e) {
+      console.warn('⚠️ Error al consultar todos los slots de agenda:', e.message);
+    }
+  }
 
   if (!horaSeleccionada) {
     let msg = `❌ Selección de horario no reconocida. Responde con el número del horario o escribe directamente la hora (ej: "a las 5 PM" o "10:30"):\n\n`;
@@ -2167,6 +2229,35 @@ app.post('/api/bloqueos', async (req, res) => {
 app.delete('/api/bloqueos/:id', async (req, res) => {
   try {
     await dbRun('DELETE FROM bloqueos_agenda WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── API de Exclusiones del Chatbot (Lista Negra) ───────────────────
+app.get('/api/exclusiones', async (req, res) => {
+  try {
+    const list = await dbAll('SELECT * FROM contactos_excluidos ORDER BY creado_en DESC');
+    res.json(list);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/exclusiones', async (req, res) => {
+  let { telefono, nombre } = req.body;
+  if (!telefono) return res.status(400).json({ error: 'Teléfono es requerido.' });
+  const normalized = recordatorios.normalizarTelefono(telefono);
+  if (!normalized) return res.status(400).json({ error: 'Formato de teléfono inválido.' });
+  try {
+    await dbRun(
+      'INSERT OR REPLACE INTO contactos_excluidos (telefono, nombre) VALUES (?, ?)',
+      [normalized, (nombre || '').trim()]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/exclusiones/:telefono', async (req, res) => {
+  try {
+    await dbRun('DELETE FROM contactos_excluidos WHERE telefono = ?', [req.params.telefono]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

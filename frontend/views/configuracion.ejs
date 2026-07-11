@@ -437,6 +437,57 @@
                         </div>
                     </div>
 
+                    <!-- Fila 5: Exclusiones del Chatbot (Lista Negra) -->
+                    <div class="row g-4 mt-1">
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-header bg-transparent border-0 pt-4 pb-0">
+                                    <h5 class="fw-bold mb-0 text-danger"><i class="bi bi-person-x-fill me-2"></i> Exclusiones del Chatbot (Lista Negra)</h5>
+                                    <p class="text-muted small mt-1">Los contactos agregados a esta lista serán ignorados por el chatbot de forma permanente.</p>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <!-- Tabla de Exclusiones -->
+                                        <div class="col-lg-7">
+                                            <div class="table-responsive" style="max-height: 250px;">
+                                                <table class="table table-hover align-middle table-sm border-0" id="table-exclusiones">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Nombre / Identificador</th>
+                                                            <th>Teléfono</th>
+                                                            <th class="text-end">Acción</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Cargado vía JS -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Formulario para Agregar Exclusión -->
+                                        <div class="col-lg-5 border-start">
+                                            <h6 class="fw-bold mb-3"><i class="bi bi-person-plus-fill me-1"></i> Excluir Nuevo Contacto</h6>
+                                            <div class="row g-2">
+                                                <div class="col-12">
+                                                    <input type="text" class="form-control form-control-sm" id="excl-nombre" placeholder="Nombre (ej. Familia - Mamá, Amigo - Carlos)">
+                                                </div>
+                                                <div class="col-12">
+                                                    <input type="text" class="form-control form-control-sm" id="excl-telefono" placeholder="Número de WhatsApp (con código de país, ej. 52155...)">
+                                                </div>
+                                                <div class="col-12 text-end mt-2">
+                                                    <button type="button" class="btn btn-sm btn-danger" onclick="agregarExclusion()">
+                                                        <i class="bi bi-person-x-fill me-1"></i> Excluir Número
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Botón de Envío -->
                     <div class="row mt-4">
                         <div class="col-12 text-end mb-4">
@@ -512,6 +563,7 @@
 
             loadServicios();
             loadBloqueos();
+            loadExclusiones();
         });
 
         async function loadUnreadCount() {
@@ -688,6 +740,67 @@
                 const res = await fetch(`/api/bloqueos/${id}`, { method: 'DELETE' });
                 if (res.ok) loadBloqueos();
             } catch (err) { alert('Error al eliminar bloqueo.'); }
+        }
+
+        // Funciones para Exclusiones de Chatbot (Lista Negra)
+        async function loadExclusiones() {
+            try {
+                const res = await fetch('/api/exclusiones');
+                const list = await res.json();
+                const tbody = document.querySelector('#table-exclusiones tbody');
+                tbody.innerHTML = '';
+                if (list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No hay exclusiones configuradas.</td></tr>';
+                    return;
+                }
+                list.forEach(ex => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${ex.nombre || 'Sin nombre'}</strong></td>
+                            <td><span class="badge bg-danger-subtle text-danger">${ex.telefono}</span></td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="eliminarExclusion('${ex.telefono}')">
+                                    <i class="bi bi-trash3-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (err) { console.error('Error cargando exclusiones:', err); }
+        }
+
+        async function agregarExclusion() {
+            const nombre = document.getElementById('excl-nombre').value.trim();
+            const telefono = document.getElementById('excl-telefono').value.trim();
+
+            if (!telefono) {
+                alert('Ingresa al menos el número de WhatsApp para la exclusión.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/exclusiones', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, telefono })
+                });
+                if (res.ok) {
+                    document.getElementById('excl-nombre').value = '';
+                    document.getElementById('excl-telefono').value = '';
+                    loadExclusiones();
+                } else {
+                    const data = await res.json();
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) { alert('Error agregando exclusión.'); }
+        }
+
+        async function eliminarExclusion(telefono) {
+            if (!confirm('¿Estás seguro de eliminar este número de la lista negra?')) return;
+            try {
+                const res = await fetch(`/api/exclusiones/${telefono}`, { method: 'DELETE' });
+                if (res.ok) loadExclusiones();
+            } catch (err) { alert('Error al eliminar exclusión.'); }
         }
     </script>
 </body>
