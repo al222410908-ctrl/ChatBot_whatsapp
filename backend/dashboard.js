@@ -1523,10 +1523,160 @@ async function procesarEncuesta(telefono, respuesta, estado) {
   await recordatorios.enviarMensaje(telefono, `🙏 ¡Muchas gracias por calificar con un *${calificacion}*! Tu opinion nos ayuda a mejorar. 🩺`);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// FILTRO: esMensajeRelevante
+// El bot SOLO responde si el mensaje activa una keyword de inicio
+// O si el usuario ya está dentro de un paso activo del flujo.
+// Cualquier otro mensaje → ignorado: true (silencio absoluto).
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Normaliza texto: quita acentos y convierte a minúsculas.
+ * Permite comparar "Sí" === "si", "Cita" === "cita", etc.
+ */
+function normalizar(texto) {
+  if (!texto) return '';
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // eliminar diacríticos (acentos, tildes)
+    .trim();
+}
+
+/**
+ * Keywords que inician el flujo desde cero.
+ * Se comparan contra el texto NORMALIZADO del mensaje.
+ */
+const KEYWORDS_INICIO = [
+  'cita', 'agendar', 'consulta', 'turno',
+  'menu', 'inicio',
+  'mis citas', 'consultar', 'cancelar',
+  'ayuda', 'help', 'reagendar'
+];
+
+/**
+ * Reglas de validación por paso del flujo.
+ * Cada paso declara una función que recibe el texto NORMALIZADO
+ * y devuelve true si el mensaje es válido para ese paso.
+ *
+ * Pasos que NO tienen restricción de formato (aceptan cualquier texto)
+ * simplemente devuelven true → el bot los procesa y da feedback.
+ */
+const REGLAS_PASO = {
+  // Nombre libre → acepta cualquier texto no vacío
+  esperando_nombre: (txt) => txt.length > 0,
+
+  // Número de servicio o nombre parcial
+  esperando_servicio: (txt) => /\d/.test(txt) || txt.length >= 2,
+
+  // Fecha: número, "hoy", "mañana", día de la semana o DD/MM/YYYY
+  esperando_fecha: (txt) =>
+    /^\d+$/.test(txt) ||
+    txt === 'hoy' || txt === 'manana' || txt === 'mañana' ||
+    /lunes|martes|miercoles|jueves|viernes|sabado|domingo/.test(txt) ||
+    /^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(txt) ||
+    txt === 'cancelar',
+
+  // Horario: número de opción, hora HH:MM o texto como "a las 5"
+  esperando_seleccion_hora: (txt) =>
+    /^\d+$/.test(txt) ||
+    /\d{1,2}:\d{2}/.test(txt) ||
+    /a las|las \d|\d pm|\d am/.test(txt) ||
+    txt === 'cancelar',
+
+  // Motivo libre
+  esperando_motivo: (txt) => txt.length > 0,
+
+  // Confirmación final de cita
+  confirmar_cita: (txt) =>
+    ['si', 'no', 'cancelar', 'ok', 'dale', 'listo',
+     'confirmo', 'confirmado', 'nop', 'nel'].some(p => txt.includes(p)),
+
+  // Número de cita a cancelar
+  cancelando_cita: (txt) => /^\d+$/.test(txt),
+
+  // Fecha para reagendar (misma lógica que esperando_fecha)
+  reagendando_fecha: (txt) =>
+    /^\d+$/.test(txt) ||
+    txt === 'hoy' || txt === 'manana' || txt === 'mañana' ||
+    /lunes|martes|miercoles|jueves|viernes|sabado|domingo/.test(txt) ||
+    /^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(txt) ||
+    txt === 'cancelar',
+
+  // Hora para reagendar
+  reagendando_seleccion_hora: (txt) =>
+    /^\d+$/.test(txt) ||
+    /\d{1,2}:\d{2}/.test(txt) ||
+    /a las|las \d|\d pm|\d am/.test(txt) ||
+    txt === 'cancelar',
+
+  // Confirmación del reagendamiento
+  reagendando_confirmar: (txt) =>
+    ['si', 'no', 'cancelar', 'ok', 'dale', 'listo',
+     'confirmo', 'confirmado', 'nop', 'nel'].some(p => txt.includes(p)),
+
+  // Encuesta de satisfacción: solo dígito del 1 al 5
+  esperando_encuesta: (txt) => /^[1-5]$/.test(txt),
+
+  // Emergencia: respuesta sí/no para reagendar
+  emergencia_reagendar_inicio: (txt) =>
+    ['si', 'no', 'cancelar', 'ok', 'dale', 'listo',
+     'confirmo', 'confirmado', 'nop', 'nel'].some(p => txt.includes(p)),
+};
+
+/**
+ * Determina si el bot debe procesar o ignorar el mensaje.
+ *
+ * Condición A: el texto (normalizado) contiene alguna keyword de inicio.
+ * Condición B: el usuario tiene un paso activo en la BD y el mensaje
+ *              es válido para ese paso según REGLAS_PASO.
+ *
+ * @param {string} textoNorm  - Texto ya normalizado
+ * @param {object|null} estado - Fila de conversaciones o null
+ * @returns {{ relevante: boolean, razon: string }}
+ */
+function esMensajeRelevante(textoNorm, estado) {
+  // ── Condición A: keyword de inicio ────────────────────────────
+  const activaKeyword = KEYWORDS_INICIO.some(kw => textoNorm.includes(kw));
+  if (activaKeyword) {
+    return { relevante: true, razon: 'keyword_inicio' };
+  }
+
+  // ── Condición B: paso activo con input válido ──────────────────
+  if (estado?.estado) {
+    const paso = estado.estado;
+    const regla = REGLAS_PASO[paso];
+
+    if (regla) {
+      if (regla(textoNorm)) {
+        return { relevante: true, razon: `paso_activo:${paso}` };
+      } else {
+        // Paso activo pero input inválido → ignorar para no spamear
+        return { relevante: false, razon: `input_invalido_en_paso:${paso}` };
+      }
+    } else {
+      // Paso activo sin regla definida → dejar pasar (seguro)
+      return { relevante: true, razon: `paso_sin_regla:${paso}` };
+    }
+  }
+
+  // Ninguna condición cumplida → ignorar
+  return { relevante: false, razon: 'sin_keyword_y_sin_estado' };
+}
+
 async function procesarMensaje(telefono, mensaje) {
+  const textoNorm = normalizar(mensaje);
   const mensajeLower = mensaje.toLowerCase().trim();
   const estado = await obtenerEstadoConversacion(telefono);
-  console.log(`📩 Mensaje de ${telefono}: "${mensaje}" | Estado: ${estado?.estado || 'nuevo'}`);
+
+  // ── FILTRO PRINCIPAL: esMensajeRelevante ──────────────────────
+  const { relevante, razon } = esMensajeRelevante(textoNorm, estado);
+  if (!relevante) {
+    console.log(`🔇 [FILTRO] Mensaje ignorado de ${telefono} ("${mensaje.substring(0, 60)}") → razón: ${razon}`);
+    return { ignorado: true };
+  }
+
+  console.log(`📩 Mensaje de ${telefono}: "${mensaje}" | Estado: ${estado?.estado || 'nuevo'} | Razón aceptado: ${razon}`);
 
   if (estado?.estado) {
     const esComando = mensajeLower.includes('cita') || 
@@ -1574,18 +1724,13 @@ async function procesarMensaje(telefono, mensaje) {
   } else if (mensajeLower.includes('ayuda') || mensajeLower.includes('help')) {
     return mostrarAyuda(telefono);
   } else if (
-    mensajeLower === 'hola' || mensajeLower.startsWith('hola ') || 
-    mensajeLower.includes('buen dia') || mensajeLower.includes('buen día') ||
-    mensajeLower.includes('buenos dias') || mensajeLower.includes('buenos días') ||
-    mensajeLower.includes('buenas tardes') || mensajeLower.includes('buenas noches') ||
-    mensajeLower === 'menu' || mensajeLower === 'menú' || 
-    mensajeLower === 'comenzar' || mensajeLower === 'inicio' || 
-    mensajeLower === 'empezar'
+    textoNorm === 'menu' || textoNorm === 'menu' ||
+    textoNorm === 'inicio' || textoNorm === 'menú'
   ) {
     return mostrarMenu(telefono);
   } else {
-    // Si no es un comando ni un saludo conocido, no hacemos nada (evita spam al chatear con el doctor)
-    console.log(`🔇 Mensaje no reconocido de ${telefono} ("${mensaje}"). Chatbot en silencio.`);
+    // Llegó aquí por keyword pero no encaja en ningún handler → silencio
+    console.log(`🔇 Keyword sin handler específico de ${telefono} ("${mensaje}"). Chatbot en silencio.`);
     return;
   }
 }
